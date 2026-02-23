@@ -1,7 +1,7 @@
 package immich
 
 import (
-	"fmt"
+	"io"
 	"mime/multipart"
 )
 
@@ -10,6 +10,6 @@ func writeField(writer *multipart.Writer, fieldName string, value string) error 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(fw, value)
+	io.WriteString(fw, value)
 	return nil
 }

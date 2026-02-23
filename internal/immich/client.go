@@ -3,10 +3,12 @@ package immich
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -16,8 +18,16 @@ type Client struct {
 }
 
 type UploadResult struct {
-	Id        string `json:"id"`
-	Duplicate bool   `json:"duplicate"`
+	Id     string `json:"id"`
+	Status string `json:"status"`
+}
+
+type UploadRequest struct {
+	AssetData      io.Reader
+	DeviceAssetID  string
+	DeviceID       string
+	FileCreatedAt  string
+	FileModifiedAt string
 }
 
 func (c *Client) UploadAsset(filePath string) (*UploadResult, error) {
@@ -28,8 +38,7 @@ func (c *Client) UploadAsset(filePath string) (*UploadResult, error) {
 	modtime := fileinfo.ModTime()
 	modtimeString := modtime.Format(time.RFC3339)
 
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
+	param := UploadRequest{}
 
 	// ファイルのバイナリ
 	file, err := os.Open(filePath)
@@ -37,31 +46,34 @@ func (c *Client) UploadAsset(filePath string) (*UploadResult, error) {
 		return nil, err
 	}
 	defer file.Close()
-	part, err := writer.CreateFormFile("assetData", filePath)
+	param.AssetData = file
+
+	param.DeviceAssetID = filePath
+	param.DeviceID = "immich-windows-sync"
+	param.FileCreatedAt = modtimeString
+	param.FileModifiedAt = modtimeString
+
+	// 各フィールドへの書き込み
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("assetData", filepath.Base(filePath))
 	if err != nil {
 		return nil, err
 	}
-	if _, err = io.Copy(part, file); err != nil {
+	if _, err = io.Copy(part, param.AssetData); err != nil {
 		return nil, err
 	}
-
-	// 任意のユニークID（ファイルパスで十分）
-	if err = writeField(writer, "deviceAssetId", filePath); err != nil {
+	if err = writeField(writer, "deviceAssetId", param.DeviceAssetID); err != nil {
 		return nil, err
 	}
-
-	// "immich-windows-sync" 固定でOK
-	if err = writeField(writer, "deviceId", "immich-windows-sync"); err != nil {
+	if err = writeField(writer, "deviceId", param.DeviceID); err != nil {
 		return nil, err
 	}
-
-	// fileinfo.ModTime() をISO 8601文字列に変換
-	if err = writeField(writer, "fileCreatedAt", modtimeString); err != nil {
+	if err = writeField(writer, "fileCreatedAt", param.FileCreatedAt); err != nil {
 		return nil, err
 	}
-
-	// fileCreatedAtと同じ
-	if err = writeField(writer, "fileModifiedAt", modtimeString); err != nil {
+	if err = writeField(writer, "fileModifiedAt", param.FileModifiedAt); err != nil {
 		return nil, err
 	}
 
@@ -83,6 +95,10 @@ func (c *Client) UploadAsset(filePath string) (*UploadResult, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != 200 && res.StatusCode != 201 {
+		return nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
