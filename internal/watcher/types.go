@@ -13,6 +13,7 @@ const (
 	Create
 	Write
 	Remove
+	Rename
 )
 
 type Event struct {
@@ -22,6 +23,7 @@ type Event struct {
 
 type Watcher struct {
 	Events  chan Event
+	Errors  chan error
 	cancel  context.CancelFunc
 	watcher *fsnotify.Watcher
 }
