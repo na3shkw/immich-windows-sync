@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"immich-windows-sync/internal/config"
 )
 
 // App struct
@@ -24,4 +25,12 @@ func (a *App) startup(ctx context.Context) {
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, It's show time!", name)
+}
+
+func (a *App) LoadConfig() (*config.Config, error) {
+	return config.Load()
+}
+
+func (a *App) SaveConfig(cfg config.Config) error {
+	return config.Save(cfg)
 }
