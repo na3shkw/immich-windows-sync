@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"immich-windows-sync/internal/config"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -33,4 +35,10 @@ func (a *App) LoadConfig() (*config.Config, error) {
 
 func (a *App) SaveConfig(cfg config.Config) error {
 	return config.Save(cfg)
+}
+
+func (a *App) SelectFolder() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "フォルダを選択",
+	})
 }

@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { LoadConfig, SaveConfig } from '../wailsjs/go/main/App';
+import { LoadConfig, SaveConfig, SelectFolder } from '../wailsjs/go/main/App';
 import { config } from '../wailsjs/go/models';
 
 type Page = 'connection' | 'folders' | 'status';
+type SaveStatus = 'idle' | 'saved' | 'error';
 
 function App() {
   const [activePage, setActivePage] = useState<Page>('connection');
   const [cfg, setCfg] = useState<config.Config>(
     config.Config.createFrom({ immich: { serverURL: '', apiKey: '' }, targetFolders: [] })
   );
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
   useEffect(() => {
     LoadConfig().then(setCfg);
@@ -24,6 +25,27 @@ function App() {
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
+  };
+
+  const handleAddFolder = async () => {
+    const folder = await SelectFolder();
+    if (!folder) return;
+    if (cfg.targetFolders?.includes(folder)) return;
+    const updated = config.Config.createFrom({
+      ...cfg,
+      targetFolders: [...(cfg.targetFolders ?? []), folder],
+    });
+    setCfg(updated);
+    await SaveConfig(updated);
+  };
+
+  const handleRemoveFolder = async (folder: string) => {
+    const updated = config.Config.createFrom({
+      ...cfg,
+      targetFolders: cfg.targetFolders?.filter((f) => f !== folder) ?? [],
+    });
+    setCfg(updated);
+    await SaveConfig(updated);
   };
 
   const navItems: { id: Page; label: string; icon: string }[] = [
@@ -74,7 +96,11 @@ function App() {
             <ConnectionPage cfg={cfg} setCfg={setCfg} onSave={handleSave} saveStatus={saveStatus} />
           )}
           {activePage === 'folders' && (
-            <div className="text-on-surface-variant">Coming soon...</div>
+            <FolderManagementPage
+              folders={cfg.targetFolders ?? []}
+              onAdd={handleAddFolder}
+              onRemove={handleRemoveFolder}
+            />
           )}
           {activePage === 'status' && (
             <div className="text-on-surface-variant">Coming soon...</div>
@@ -84,8 +110,6 @@ function App() {
     </div>
   );
 }
-
-type SaveStatus = 'idle' | 'saved' | 'error';
 
 function ConnectionPage({
   cfg,
@@ -179,6 +203,62 @@ function ConnectionPage({
             Save Changes
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FolderManagementPage({
+  folders,
+  onAdd,
+  onRemove,
+}: {
+  folders: string[];
+  onAdd: () => void;
+  onRemove: (folder: string) => void;
+}) {
+  return (
+    <div className="max-w-xl">
+      <p className="text-on-surface-variant text-sm mb-8">
+        Select folders to monitor and sync to Immich.
+      </p>
+
+      <div className="bg-surface-container rounded-xl p-8 space-y-6">
+        {/* Folder List */}
+        <div className="space-y-2">
+          {folders.length === 0 ? (
+            <p className="text-on-surface-variant text-sm text-center py-6">
+              No folders added yet.
+            </p>
+          ) : (
+            folders.map((folder) => (
+              <div
+                key={folder}
+                className="flex items-center justify-between bg-surface-container-lowest border border-outline-variant/20 rounded-lg px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-primary text-[20px] shrink-0">folder</span>
+                  <span className="text-sm font-mono text-on-surface break-all">{folder}</span>
+                </div>
+                <button
+                  onClick={() => onRemove(folder)}
+                  className="material-symbols-outlined text-on-surface-variant hover:text-error transition-colors text-[20px] shrink-0 ml-4"
+                >
+                  delete
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Add Button */}
+        <button
+          onClick={onAdd}
+          className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant/40 hover:border-primary text-on-surface-variant hover:text-primary rounded-lg py-3 text-sm font-medium transition-all"
+        >
+          <span className="material-symbols-outlined text-[20px]">add</span>
+          Add Folder
+        </button>
       </div>
     </div>
   );

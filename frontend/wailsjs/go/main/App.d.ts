@@ -7,3 +7,5 @@ export function Greet(arg1:string):Promise<string>;
 export function LoadConfig():Promise<config.Config>;
 
 export function SaveConfig(arg1:config.Config):Promise<void>;
+
+export function SelectFolder():Promise<string>;
