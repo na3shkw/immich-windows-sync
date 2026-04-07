@@ -4,6 +4,7 @@ import { config } from '../wailsjs/go/models';
 
 type Page = 'connection' | 'folders' | 'status';
 type SaveStatus = 'idle' | 'saved' | 'error';
+type WatcherStatus = 'stopped' | 'running';
 
 function App() {
   const [activePage, setActivePage] = useState<Page>('connection');
@@ -11,6 +12,8 @@ function App() {
     config.Config.createFrom({ immich: { serverURL: '', apiKey: '' }, targetFolders: [] })
   );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [watcherStatus, setWatcherStatus] = useState<WatcherStatus>('stopped');
+  const [logs, setLogs] = useState<string[]>([]);
 
   useEffect(() => {
     LoadConfig().then(setCfg);
@@ -46,6 +49,23 @@ function App() {
     });
     setCfg(updated);
     await SaveConfig(updated);
+  };
+
+  const handleStartWatcher = () => {
+    // TODO: StartWatcher()
+    setWatcherStatus('running');
+    setLogs((prev) => [...prev, `[${now()}] Watcher started.`]);
+  };
+
+  const handleStopWatcher = () => {
+    // TODO: StopWatcher()
+    setWatcherStatus('stopped');
+    setLogs((prev) => [...prev, `[${now()}] Watcher stopped.`]);
+  };
+
+  const handleSyncNow = () => {
+    // TODO: SyncNow()
+    setLogs((prev) => [...prev, `[${now()}] Manual sync triggered.`]);
   };
 
   const navItems: { id: Page; label: string; icon: string }[] = [
@@ -103,12 +123,22 @@ function App() {
             />
           )}
           {activePage === 'status' && (
-            <div className="text-on-surface-variant">Coming soon...</div>
+            <SyncStatusPage
+              watcherStatus={watcherStatus}
+              logs={logs}
+              onStart={handleStartWatcher}
+              onStop={handleStopWatcher}
+              onSyncNow={handleSyncNow}
+            />
           )}
         </div>
       </main>
     </div>
   );
+}
+
+function now() {
+  return new Date().toLocaleTimeString();
 }
 
 function ConnectionPage({
@@ -140,7 +170,6 @@ function ConnectionPage({
       </p>
 
       <div className="bg-surface-container rounded-xl p-8 space-y-6">
-        {/* Server URL */}
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-widest font-bold text-primary opacity-80">
             Server URL
@@ -159,7 +188,6 @@ function ConnectionPage({
           </div>
         </div>
 
-        {/* API Key */}
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-widest font-bold text-primary opacity-80">
             API Key
@@ -182,7 +210,6 @@ function ConnectionPage({
           </div>
         </div>
 
-        {/* Save Button */}
         <div className="flex items-center justify-end gap-4 pt-2">
           {saveStatus === 'saved' && (
             <span className="text-xs text-secondary flex items-center gap-1">
@@ -224,7 +251,6 @@ function FolderManagementPage({
       </p>
 
       <div className="bg-surface-container rounded-xl p-8 space-y-6">
-        {/* Folder List */}
         <div className="space-y-2">
           {folders.length === 0 ? (
             <p className="text-on-surface-variant text-sm text-center py-6">
@@ -251,7 +277,6 @@ function FolderManagementPage({
           )}
         </div>
 
-        {/* Add Button */}
         <button
           onClick={onAdd}
           className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant/40 hover:border-primary text-on-surface-variant hover:text-primary rounded-lg py-3 text-sm font-medium transition-all"
@@ -259,6 +284,79 @@ function FolderManagementPage({
           <span className="material-symbols-outlined text-[20px]">add</span>
           Add Folder
         </button>
+      </div>
+    </div>
+  );
+}
+
+function SyncStatusPage({
+  watcherStatus,
+  logs,
+  onStart,
+  onStop,
+  onSyncNow,
+}: {
+  watcherStatus: WatcherStatus;
+  logs: string[];
+  onStart: () => void;
+  onStop: () => void;
+  onSyncNow: () => void;
+}) {
+  return (
+    <div className="max-w-xl space-y-6">
+      {/* Watcher Controls */}
+      <div className="bg-surface-container rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`h-2 w-2 rounded-full ${watcherStatus === 'running' ? 'bg-secondary shadow-[0_0_8px_rgba(23,192,253,0.6)]' : 'bg-outline'}`} />
+            <span className="text-sm font-medium text-on-surface">
+              {watcherStatus === 'running' ? 'Watcher Running' : 'Watcher Stopped'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onSyncNow}
+              disabled={watcherStatus !== 'running'}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-surface-container-highest text-on-surface hover:bg-surface-bright disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <span className="material-symbols-outlined text-[18px]">sync</span>
+              Sync Now
+            </button>
+            {watcherStatus === 'stopped' ? (
+              <button
+                onClick={onStart}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-gradient-to-br from-primary to-primary-container text-on-primary-fixed active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-[18px]">play_arrow</span>
+                Start
+              </button>
+            ) : (
+              <button
+                onClick={onStop}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-surface-container-highest text-error hover:bg-error-container/20 active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-[18px]">stop</span>
+                Stop
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Log Area */}
+      <div className="bg-surface-container rounded-xl p-6 space-y-3">
+        <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">
+          Logs
+        </span>
+        <div className="bg-surface-container-lowest rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-on-surface-variant space-y-1">
+          {logs.length === 0 ? (
+            <p className="text-center pt-8">No logs yet.</p>
+          ) : (
+            logs.map((log, i) => (
+              <p key={i}>{log}</p>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
