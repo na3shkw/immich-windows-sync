@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LoadConfig, SaveConfig, SelectFolder } from '../wailsjs/go/main/App';
+import { LoadConfig, SaveConfig, SelectFolder, StartWatcher, StopWatcher, SyncNow } from '../wailsjs/go/main/App';
 import { config } from '../wailsjs/go/models';
 
 type Page = 'connection' | 'folders' | 'status';
@@ -52,19 +52,19 @@ function App() {
   };
 
   const handleStartWatcher = () => {
-    // TODO: StartWatcher()
+    StartWatcher();
     setWatcherStatus('running');
     setLogs((prev) => [...prev, `[${now()}] Watcher started.`]);
   };
 
   const handleStopWatcher = () => {
-    // TODO: StopWatcher()
+    StopWatcher();
     setWatcherStatus('stopped');
     setLogs((prev) => [...prev, `[${now()}] Watcher stopped.`]);
   };
 
   const handleSyncNow = () => {
-    // TODO: SyncNow()
+    SyncNow();
     setLogs((prev) => [...prev, `[${now()}] Manual sync triggered.`]);
   };
 

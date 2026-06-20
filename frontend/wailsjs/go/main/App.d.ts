@@ -9,3 +9,9 @@ export function LoadConfig():Promise<config.Config>;
 export function SaveConfig(arg1:config.Config):Promise<void>;
 
 export function SelectFolder():Promise<string>;
+
+export function StartWatcher():Promise<void>;
+
+export function StopWatcher():Promise<void>;
+
+export function SyncNow():Promise<void>;

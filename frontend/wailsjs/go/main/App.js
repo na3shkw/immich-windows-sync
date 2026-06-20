@@ -17,3 +17,15 @@ export function SaveConfig(arg1) {
 export function SelectFolder() {
   return window['go']['main']['App']['SelectFolder']();
 }
+
+export function StartWatcher() {
+  return window['go']['main']['App']['StartWatcher']();
+}
+
+export function StopWatcher() {
+  return window['go']['main']['App']['StopWatcher']();
+}
+
+export function SyncNow() {
+  return window['go']['main']['App']['SyncNow']();
+}
