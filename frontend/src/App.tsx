@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { LoadConfig, SaveConfig, SelectFolder, StartWatcher, StopWatcher, SyncNow } from '../wailsjs/go/main/App';
+import { LoadConfig, SaveConfig, SelectFolder, StartWatcher, StopWatcher, SyncNow, IsStartupRegistered, RegisterStartup, UnRegisterStartup } from '../wailsjs/go/main/App';
 import { config } from '../wailsjs/go/models';
 
-type Page = 'connection' | 'folders' | 'status';
+type Page = 'connection' | 'folders' | 'status' | 'startup';
 type SaveStatus = 'idle' | 'saved' | 'error';
 type WatcherStatus = 'stopped' | 'running';
 
@@ -14,9 +14,12 @@ function App() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [watcherStatus, setWatcherStatus] = useState<WatcherStatus>('stopped');
   const [logs, setLogs] = useState<string[]>([]);
+  const [startupRegistered, setStartupRegistered] = useState<boolean>(false);
+  const [startupLoading, setStartupLoading] = useState<boolean>(false);
 
   useEffect(() => {
     LoadConfig().then(setCfg);
+    IsStartupRegistered().then(setStartupRegistered);
   }, []);
 
   const handleSave = async () => {
@@ -68,10 +71,26 @@ function App() {
     setLogs((prev) => [...prev, `[${now()}] Manual sync triggered.`]);
   };
 
+  const handleToggleStartup = async () => {
+    setStartupLoading(true);
+    try {
+      if (startupRegistered) {
+        await UnRegisterStartup();
+        setStartupRegistered(false);
+      } else {
+        await RegisterStartup();
+        setStartupRegistered(true);
+      }
+    } finally {
+      setStartupLoading(false);
+    }
+  };
+
   const navItems: { id: Page; label: string; icon: string }[] = [
     { id: 'connection', label: 'Connection Settings', icon: 'settings_input_component' },
     { id: 'folders', label: 'Folder Management', icon: 'folder_shared' },
     { id: 'status', label: 'Sync Status', icon: 'sync_saved_locally' },
+    { id: 'startup', label: 'Startup Settings', icon: 'play_circle' },
   ];
 
   return (
@@ -129,6 +148,13 @@ function App() {
               onStart={handleStartWatcher}
               onStop={handleStopWatcher}
               onSyncNow={handleSyncNow}
+            />
+          )}
+          {activePage === 'startup' && (
+            <StartupPage
+              registered={startupRegistered}
+              loading={startupLoading}
+              onToggle={handleToggleStartup}
             />
           )}
         </div>
@@ -356,6 +382,66 @@ function SyncStatusPage({
               <p key={i}>{log}</p>
             ))
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StartupPage({
+  registered,
+  loading,
+  onToggle,
+}: {
+  registered: boolean;
+  loading: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="max-w-xl">
+      <p className="text-on-surface-variant text-sm mb-8">
+        Configure whether the application starts automatically when Windows boots.
+      </p>
+
+      <div className="bg-surface-container rounded-xl p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-on-surface">Launch at Windows startup</p>
+            <p className="text-xs text-on-surface-variant">
+              Automatically start immich-sync when you log in to Windows.
+            </p>
+          </div>
+          <button
+            onClick={onToggle}
+            disabled={loading}
+            aria-pressed={registered}
+            className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+              registered
+                ? 'bg-primary border-primary'
+                : 'bg-surface-container-highest border-outline-variant'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                registered ? 'translate-x-5' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm ${
+          registered
+            ? 'bg-secondary/10 text-secondary'
+            : 'bg-surface-container-highest text-on-surface-variant'
+        }`}>
+          <span className="material-symbols-outlined text-[18px] shrink-0">
+            {registered ? 'check_circle' : 'radio_button_unchecked'}
+          </span>
+          <span>
+            {registered
+              ? 'Registered — immich-sync will start automatically on login.'
+              : 'Not registered — immich-sync will not start automatically.'}
+          </span>
         </div>
       </div>
     </div>

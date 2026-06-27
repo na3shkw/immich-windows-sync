@@ -6,8 +6,16 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function IsStartupRegistered() {
+  return window['go']['main']['App']['IsStartupRegistered']();
+}
+
 export function LoadConfig() {
   return window['go']['main']['App']['LoadConfig']();
+}
+
+export function RegisterStartup() {
+  return window['go']['main']['App']['RegisterStartup']();
 }
 
 export function SaveConfig(arg1) {
@@ -28,4 +36,8 @@ export function StopWatcher() {
 
 export function SyncNow() {
   return window['go']['main']['App']['SyncNow']();
+}
+
+export function UnRegisterStartup() {
+  return window['go']['main']['App']['UnRegisterStartup']();
 }

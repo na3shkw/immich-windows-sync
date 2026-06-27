@@ -6,6 +6,7 @@ import (
 	"immich-windows-sync/internal/config"
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/immich"
+	"immich-windows-sync/internal/startup"
 	appSync "immich-windows-sync/internal/sync"
 	"immich-windows-sync/internal/watcher"
 	"log"
@@ -17,10 +18,11 @@ import (
 
 // App struct
 type App struct {
-	ctx     context.Context
-	cfg     *config.Config
-	syncer  *appSync.Syncer
-	watcher *watcher.Watcher
+	ctx             context.Context
+	cfg             *config.Config
+	syncer          *appSync.Syncer
+	watcher         *watcher.Watcher
+	startupRegistry *startup.Startup
 }
 
 // NewApp creates a new App application struct
@@ -60,6 +62,9 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	isDev := runtime.Environment(a.ctx).BuildType == "dev"
+	a.startupRegistry = startup.NewStartup(isDev)
 }
 
 // Greet returns a greeting for the given name
@@ -115,4 +120,28 @@ func (a *App) SyncNow() {
 		}
 		a.syncer.SyncAssets(files)
 	}()
+}
+
+func (a *App) RegisterStartup() error {
+	err := a.startupRegistry.Register()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *App) UnRegisterStartup() error {
+	err := a.startupRegistry.UnRegister()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *App) IsStartupRegistered() (bool, error) {
+	result, err := a.startupRegistry.IsRegistered()
+	if err != nil {
+		return false, err
+	}
+	return result, nil
 }
