@@ -98,8 +98,8 @@ function App() {
       {/* Sidebar */}
       <nav className="w-64 h-full bg-surface-container-low flex flex-col py-8 px-4 shrink-0">
         <div className="mb-10 px-2">
-          <h1 className="text-base font-bold text-primary uppercase tracking-wide">immich-sync</h1>
-          <p className="text-[10px] text-on-surface-variant uppercase tracking-widest mt-1 opacity-60">Windows Sync</p>
+          <h1 className="text-base font-bold text-primary uppercase tracking-wide">Immich Windows Sync</h1>
+          <p className="text-[10px] text-on-surface-variant uppercase tracking-widest mt-1 opacity-60">v{__APP_VERSION__}</p>
         </div>
 
         <div className="flex-1 space-y-1">
