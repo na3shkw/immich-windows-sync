@@ -190,7 +190,7 @@ function ConnectionPage({
   };
 
   return (
-    <div className="max-w-xl">
+    <div className="w-full">
       <p className="text-on-surface-variant text-sm mb-8">
         Configure your Immich server connection.
       </p>
@@ -271,7 +271,7 @@ function FolderManagementPage({
   onRemove: (folder: string) => void;
 }) {
   return (
-    <div className="max-w-xl">
+    <div className="w-full">
       <p className="text-on-surface-variant text-sm mb-8">
         Select folders to monitor and sync to Immich.
       </p>
@@ -329,7 +329,7 @@ function SyncStatusPage({
   onSyncNow: () => void;
 }) {
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="w-full space-y-6">
       {/* Watcher Controls */}
       <div className="bg-surface-container rounded-xl p-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -398,7 +398,7 @@ function StartupPage({
   onToggle: () => void;
 }) {
   return (
-    <div className="max-w-xl">
+    <div className="w-full">
       <p className="text-on-surface-variant text-sm mb-8">
         Configure whether the application starts automatically when Windows boots.
       </p>
