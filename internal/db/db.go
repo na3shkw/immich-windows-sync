@@ -14,7 +14,6 @@ func NewClient(dbFile string) (*Client, error) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS assets (
 		id                   INTEGER  PRIMARY KEY AUTOINCREMENT,
 		immich_id            TEXT,
-		checksum             TEXT     NOT NULL UNIQUE,
 		path                 TEXT     NOT NULL UNIQUE,
 		status               TEXT     NOT NULL CHECK(status IN ('success', 'syncing', 'failed')),
 		failed_count         INTEGER  NOT NULL DEFAULT 0,

@@ -13,7 +13,6 @@ type Client struct {
 type Asset struct {
 	ID                 int64
 	ImmichID           sql.NullString
-	Checksum           string
 	Path               string
 	Status             string
 	FailedCount        int64
@@ -22,25 +21,22 @@ type Asset struct {
 	UpdatedAt          time.Time
 }
 
-func (c *Client) Create(checksum string, path string) error {
-	_, err := c.db.Exec(
-		`INSERT INTO assets (checksum, path, status, failed_count) VALUES (?, ?, ?, ?)`,
-		checksum, path, "syncing", 0,
-	)
-	return err
-}
-
+// レコードが存在しなければINSERT、存在すれば同期中状態にUPDATEする
 func (c *Client) MarkAsSyncing(path string) error {
 	_, err := c.db.Exec(
-		`UPDATE assets SET status = ?, updated_at = ? WHERE path = ?`,
-		"syncing", time.Now(), path,
+		`INSERT INTO assets (path, status, failed_count)
+		VALUES (?, 'syncing', 0)
+		ON CONFLICT(path) DO UPDATE SET
+			status = 'syncing',
+			updated_at = ?`,
+		path, time.Now(),
 	)
 	return err
 }
 
 func (c *Client) MarkAsSuccess(path string, immichId string) error {
 	_, err := c.db.Exec(
-		`UPDATE assets 
+		`UPDATE assets
 		SET
 			status = ?,
 			immich_id = ?,
@@ -53,7 +49,7 @@ func (c *Client) MarkAsSuccess(path string, immichId string) error {
 
 func (c *Client) MarkAsFailed(path string, reason string) error {
 	_, err := c.db.Exec(
-		`UPDATE assets 
+		`UPDATE assets
 		SET
 			status = ?,
 			failed_count = failed_count + 1,
@@ -70,7 +66,6 @@ func (c *Client) SearchByStatus(status string) ([]*Asset, error) {
 		`SELECT
 			id,
 			immich_id,
-			checksum,
 			path,
 			status,
 			failed_count,
@@ -91,7 +86,6 @@ func (c *Client) SearchByStatus(status string) ([]*Asset, error) {
 		err = rows.Scan(
 			&asset.ID,
 			&asset.ImmichID,
-			&asset.Checksum,
 			&asset.Path,
 			&asset.Status,
 			&asset.FailedCount,
@@ -112,7 +106,6 @@ func (c *Client) FindByPath(path string) (*Asset, error) {
 		`SELECT
 			id,
 			immich_id,
-			checksum,
 			path,
 			status,
 			failed_count,
@@ -127,43 +120,6 @@ func (c *Client) FindByPath(path string) (*Asset, error) {
 	err := row.Scan(
 		&asset.ID,
 		&asset.ImmichID,
-		&asset.Checksum,
-		&asset.Path,
-		&asset.Status,
-		&asset.FailedCount,
-		&asset.LatestFailedReason,
-		&asset.CreatedAt,
-		&asset.UpdatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	return &asset, nil
-}
-
-func (c *Client) FindByChecksum(checksum string) (*Asset, error) {
-	row := c.db.QueryRow(
-		`SELECT
-			id,
-			immich_id,
-			checksum,
-			path,
-			status,
-			failed_count,
-			latest_failed_reason,
-			created_at,
-			updated_at
-		FROM assets WHERE checksum = ?`,
-		checksum,
-	)
-
-	asset := Asset{}
-	err := row.Scan(
-		&asset.ID,
-		&asset.ImmichID,
-		&asset.Checksum,
 		&asset.Path,
 		&asset.Status,
 		&asset.FailedCount,

@@ -144,6 +144,7 @@ func (s *Syncer) SyncAssets(files []string) error {
 			defer wg.Done()
 			for path := range jobsCh {
 				s.dbClient.MarkAsSyncing(path)
+
 				uploadResult, err := s.immichClient.UploadAsset(path)
 				if err != nil {
 					s.dbClient.MarkAsFailed(path, err.Error())
