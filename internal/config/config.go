@@ -7,6 +7,16 @@ import (
 	"path/filepath"
 )
 
+type ImmichConfig struct {
+	ServerURL string `json:"serverURL"`
+	APIKey    string `json:"apiKey"`
+}
+
+type Config struct {
+	Immich        ImmichConfig `json:"immich"`
+	TargetFolders []string     `json:"targetFolders"`
+}
+
 func getConfigPath() (string, error) {
 	appdataDir := os.Getenv("APPDATA")
 	if appdataDir == "" {

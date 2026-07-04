@@ -8,6 +8,12 @@ import (
 	"sync"
 )
 
+type Syncer struct {
+	workerCount  int
+	immichClient *immich.Client
+	dbClient     *db.Client
+}
+
 // 指定フォルダを再帰的に走査（filepath.Walk）
 //   └── 各ファイルについて
 //         ├── 画像・動画ファイルか判定（拡張子フィルタ）
