@@ -7,7 +7,7 @@ import (
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/immich"
 	"immich-windows-sync/internal/startup"
-	appSync "immich-windows-sync/internal/sync"
+	"immich-windows-sync/internal/syncer"
 	"immich-windows-sync/internal/watcher"
 	"log"
 	"os"
@@ -20,7 +20,7 @@ import (
 type App struct {
 	ctx             context.Context
 	cfg             *config.Config
-	syncer          *appSync.Syncer
+	syncer          *syncer.Syncer
 	watcher         *watcher.Watcher
 	startupRegistry *startup.Startup
 }
@@ -56,7 +56,7 @@ func (a *App) startup(ctx context.Context) {
 		log.Fatal(err)
 	}
 
-	a.syncer = appSync.NewSyncer(5, &immichClient, dbClient)
+	a.syncer = syncer.NewSyncer(5, &immichClient, dbClient)
 
 	a.watcher, err = watcher.NewWatcher()
 	if err != nil {

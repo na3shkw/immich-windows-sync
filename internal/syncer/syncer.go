@@ -1,10 +1,11 @@
-package sync
+package syncer
 
 import (
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/immich"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -12,6 +13,79 @@ type Syncer struct {
 	workerCount  int
 	immichClient *immich.Client
 	dbClient     *db.Client
+}
+
+// 同期対象ファイルの拡張子
+// Immichでサポートされているファイルタイプ：https://github.com/immich-app/immich/blob/v3.0.1/server/src/utils/mime-types.ts
+var targetExtensions = map[string]struct{}{
+	".3fr":  {},
+	".3gp":  {},
+	".3gpp": {},
+	".ari":  {},
+	".arw":  {},
+	".avi":  {},
+	".avif": {},
+	".bmp":  {},
+	".cap":  {},
+	".cin":  {},
+	".cr2":  {},
+	".cr3":  {},
+	".crw":  {},
+	".dcr":  {},
+	".dng":  {},
+	".erf":  {},
+	".fff":  {},
+	".flv":  {},
+	".gif":  {},
+	".heic": {},
+	".heif": {},
+	".hif":  {},
+	".iiq":  {},
+	".insp": {},
+	".insv": {},
+	".jp2":  {},
+	".jpe":  {},
+	".jpeg": {},
+	".jpg":  {},
+	".jxl":  {},
+	".k25":  {},
+	".kdc":  {},
+	".m2t":  {},
+	".m2ts": {},
+	".m4v":  {},
+	".mkv":  {},
+	".mov":  {},
+	".mp4":  {},
+	".mpe":  {},
+	".mpeg": {},
+	".mpg":  {},
+	".mpo":  {},
+	".mrw":  {},
+	".mts":  {},
+	".mxf":  {},
+	".nef":  {},
+	".nrw":  {},
+	".orf":  {},
+	".ori":  {},
+	".pef":  {},
+	".png":  {},
+	".psd":  {},
+	".raf":  {},
+	".raw":  {},
+	".rw2":  {},
+	".rwl":  {},
+	".sr2":  {},
+	".srf":  {},
+	".srw":  {},
+	".svg":  {},
+	".tif":  {},
+	".tiff": {},
+	".ts":   {},
+	".vob":  {},
+	".webm": {},
+	".webp": {},
+	".wmv":  {},
+	".x3f":  {},
 }
 
 func NewSyncer(workerCount int, immichClient *immich.Client, dbClient *db.Client) *Syncer {
@@ -24,13 +98,17 @@ func NewSyncer(workerCount int, immichClient *immich.Client, dbClient *db.Client
 
 // 指定フォルダを再帰的に走査して拡張子でフィルタリング後・未同期のものだけを抽出してファイルパスを返す
 func (s *Syncer) ScanUnsyncedFiles(targetDir string) ([]string, error) {
-	// targetDir配下を再帰的に走査して拡張子でファイルをフィルタリングする
 	files := []string{}
 	err := filepath.Walk(targetDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		files = append(files, path)
+		if !info.IsDir() {
+			extension := strings.ToLower(filepath.Ext(path))
+			if _, ok := targetExtensions[extension]; ok {
+				files = append(files, path)
+			}
+		}
 		return nil
 	})
 	if err != nil {
