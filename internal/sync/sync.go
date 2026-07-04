@@ -14,18 +14,6 @@ type Syncer struct {
 	dbClient     *db.Client
 }
 
-// 指定フォルダを再帰的に走査（filepath.Walk）
-//   └── 各ファイルについて
-//         ├── 画像・動画ファイルか判定（拡張子フィルタ）
-//         ├── DBで未同期かチェック（FindByPath / SearchByStatus）
-//         └── 未同期なら → アップロードキューへ
-
-// キューのファイルをgoroutineで並列アップロード
-//   └── 各goroutineが
-//         ├── MarkAsSyncing
-//         ├── immich.UploadAsset
-//         └── 成功 → MarkAsSuccess / 失敗 → MarkAsFailed
-
 func NewSyncer(workerCount int, immichClient *immich.Client, dbClient *db.Client) *Syncer {
 	return &Syncer{
 		workerCount:  workerCount,
@@ -49,27 +37,19 @@ func (s *Syncer) ScanUnsyncedFiles(targetDir string) ([]string, error) {
 		return nil, err
 	}
 
-	failedRecords, err := s.dbClient.SearchByStatus("failed")
+	assets, err := s.dbClient.SearchByStatus("success")
 	if err != nil {
 		return nil, err
+	}
+	syncedFiles := make(map[string]*db.Asset, len(assets))
+	for _, a := range assets {
+		syncedFiles[a.Path] = a
 	}
 
 	unsyncedFiles := []string{}
 	for _, file := range files {
-		// TODO: DBクエリが高頻度で飛ぶので改善する
-		unsyncedRecord, err := s.dbClient.FindByPath(file)
-		if err != nil {
-			return nil, err
-		}
-		if unsyncedRecord == nil {
+		if _, ok := syncedFiles[file]; !ok {
 			unsyncedFiles = append(unsyncedFiles, file)
-		} else {
-			// TODO: 毎回ループ回していてパフォーマンスが悪いのでは？
-			for _, fr := range failedRecords {
-				if fr.Path == file {
-					unsyncedFiles = append(unsyncedFiles, file)
-				}
-			}
 		}
 	}
 
