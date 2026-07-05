@@ -28,3 +28,7 @@ func NewClient(dbFile string) (*Client, error) {
 		db: db,
 	}, nil
 }
+
+func (c *Client) Close() error {
+	return c.db.Close()
+}

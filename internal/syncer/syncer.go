@@ -96,6 +96,11 @@ func NewSyncer(workerCount int, immichClient *immich.Client, dbClient *db.Client
 	}
 }
 
+// アプリ終了時にdbClientを閉じる
+func (s *Syncer) Close() error {
+	return s.dbClient.Close()
+}
+
 // 指定フォルダを再帰的に走査して拡張子でフィルタリング後・未同期のものだけを抽出してファイルパスを返す
 func (s *Syncer) ScanUnsyncedFiles(targetDir string) ([]string, error) {
 	files := []string{}

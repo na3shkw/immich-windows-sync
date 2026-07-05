@@ -67,6 +67,14 @@ func (a *App) startup(ctx context.Context) {
 	a.startupRegistry = startup.NewStartup(isDev)
 }
 
+// shutdown is called when the app terminates. It releases resources
+// acquired during startup (e.g. the SQLite connection).
+func (a *App) shutdown(ctx context.Context) {
+	if err := a.syncer.Close(); err != nil {
+		log.Println(err)
+	}
+}
+
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, It's show time!", name)
