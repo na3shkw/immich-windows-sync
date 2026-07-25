@@ -8,8 +8,20 @@ import (
 
 const startupRunKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
 
+// registryKey は registry.Key のうち Startup が使うメソッドだけを切り出したインターフェース。
+// テストでは実際のレジストリに触れないフェイク実装に差し替える。
+type registryKey interface {
+	SetStringValue(name, value string) error
+	GetStringValue(name string) (val string, valtype uint32, err error)
+	DeleteValue(name string) error
+	Close() error
+}
+
+type openKeyFunc func(access uint32) (registryKey, error)
+
 type Startup struct {
 	keyName string
+	openKey openKeyFunc
 }
 
 func NewStartup(isDev bool) *Startup {
@@ -20,6 +32,9 @@ func NewStartup(isDev bool) *Startup {
 
 	return &Startup{
 		keyName: keyName,
+		openKey: func(access uint32) (registryKey, error) {
+			return registry.OpenKey(registry.CURRENT_USER, startupRunKeyPath, access)
+		},
 	}
 }
 
@@ -28,7 +43,7 @@ func (s *Startup) Register() error {
 	if err != nil {
 		return err
 	}
-	key, err := registry.OpenKey(registry.CURRENT_USER, startupRunKeyPath, registry.SET_VALUE)
+	key, err := s.openKey(registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
@@ -41,7 +56,7 @@ func (s *Startup) Register() error {
 }
 
 func (s *Startup) UnRegister() error {
-	key, err := registry.OpenKey(registry.CURRENT_USER, startupRunKeyPath, registry.SET_VALUE)
+	key, err := s.openKey(registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
@@ -54,7 +69,7 @@ func (s *Startup) UnRegister() error {
 }
 
 func (s *Startup) IsRegistered() (bool, error) {
-	key, err := registry.OpenKey(registry.CURRENT_USER, startupRunKeyPath, registry.QUERY_VALUE)
+	key, err := s.openKey(registry.QUERY_VALUE)
 	if err != nil {
 		return false, err
 	}

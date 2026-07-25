@@ -11,6 +11,8 @@ func NewClient(dbFile string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	// SQLiteは複数コネクションからの同時書き込みに弱く、SQLITE_BUSYで書き込みが失敗しうるため1本に制限する
+	db.SetMaxOpenConns(1)
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS assets (
 		id                   INTEGER  PRIMARY KEY AUTOINCREMENT,
 		immich_id            TEXT,
