@@ -205,4 +205,3 @@ func TestWatcher_Start_NotifiesNewSubdirectory(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(newSubDir, "photo.jpg"), []byte("data"), 0644))
 	assertNoEvent(t, w.Events, 300*time.Millisecond)
 }
-
