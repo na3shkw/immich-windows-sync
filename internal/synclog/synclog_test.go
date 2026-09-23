@@ -15,7 +15,7 @@ import (
 
 func openTestLogger(t *testing.T) (*Logger, string) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "sync.log")
+	path := filepath.Join(t.TempDir(), "sync.jsonl")
 	logger, err := Open(path)
 	require.NoError(t, err)
 	t.Cleanup(func() {

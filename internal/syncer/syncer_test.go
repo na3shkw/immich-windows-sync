@@ -27,7 +27,7 @@ func newTestDBClient(t *testing.T) *db.Client {
 
 func newTestLogger(t *testing.T) *synclog.Logger {
 	t.Helper()
-	logPath := filepath.Join(t.TempDir(), "sync.log")
+	logPath := filepath.Join(t.TempDir(), "sync.jsonl")
 	logger, err := synclog.Open(logPath)
 	require.NoError(t, err)
 	t.Cleanup(func() {
