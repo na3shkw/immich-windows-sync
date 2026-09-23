@@ -8,8 +8,8 @@ import (
 	"immich-windows-sync/internal/debounce"
 	"immich-windows-sync/internal/immich"
 	"immich-windows-sync/internal/startup"
-	"immich-windows-sync/internal/synclog"
 	"immich-windows-sync/internal/syncer"
+	"immich-windows-sync/internal/synclog"
 	"immich-windows-sync/internal/watcher"
 	"log"
 	"os"
@@ -205,7 +205,7 @@ func (a *App) SelectFolder() (string, error) {
 }
 
 func (a *App) StartWatcher() error {
-	a.SyncNow()
+	a.syncNow()
 	err := a.watcher.Start(a.cfg.TargetFolders, a.cfg.ExcludedFolders)
 	if err == nil {
 		a.syncLog.Log(map[string]any{"event": "watcher_started"})
@@ -302,6 +302,11 @@ func (a *App) OpenLogFolder() error {
 }
 
 func (a *App) SyncNow() {
+	a.syncLog.Log(map[string]any{"event": "sync_now_manual"})
+	a.syncNow()
+}
+
+func (a *App) syncNow() {
 	go func() {
 		files := []string{}
 		for _, folder := range a.cfg.TargetFolders {
@@ -311,6 +316,7 @@ func (a *App) SyncNow() {
 			}
 			files = append(files, unsyncedFile...)
 		}
+		a.syncLog.Log(map[string]any{"event": "sync_scanned", "fileCount": len(files)})
 		a.syncer.SyncAssets(files)
 	}()
 }

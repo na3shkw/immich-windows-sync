@@ -465,8 +465,7 @@ function SyncStatusPage({
           <div className="flex items-center gap-3">
             <button
               onClick={handleSyncNow}
-              disabled={watcherStatus !== 'running'}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-surface-container-highest text-on-surface hover:bg-surface-bright disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-surface-container-highest text-on-surface hover:bg-surface-bright transition-all"
             >
               <span className="material-symbols-outlined text-[18px]">sync</span>
               Sync Now
