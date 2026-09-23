@@ -1,6 +1,7 @@
 package config
 
 import (
+	"immich-windows-sync/internal/appenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,8 +38,10 @@ func TestLoad_Errors(t *testing.T) {
 			setup: func(t *testing.T) {
 				tmpdir := t.TempDir()
 				t.Setenv("APPDATA", tmpdir)
-				configPath := filepath.Join(tmpdir, "immich-sync", "config.json")
-				err := os.MkdirAll(filepath.Dir(configPath), 0644)
+				appDir, err := appenv.AppDir()
+				require.NoError(t, err)
+				configPath := filepath.Join(appDir, "config.json")
+				err = os.MkdirAll(filepath.Dir(configPath), 0644)
 				require.NoError(t, err)
 				err = os.WriteFile(configPath, []byte("{invalid json\n"), 0644)
 				require.NoError(t, err)

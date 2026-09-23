@@ -1,6 +1,7 @@
 package startup
 
 import (
+	"immich-windows-sync/internal/appenv"
 	"os"
 
 	"golang.org/x/sys/windows/registry"
@@ -24,14 +25,9 @@ type Startup struct {
 	openKey openKeyFunc
 }
 
-func NewStartup(isDev bool) *Startup {
-	keyName := "ImmichWindowsSync"
-	if isDev {
-		keyName += "-dev"
-	}
-
+func NewStartup() *Startup {
 	return &Startup{
-		keyName: keyName,
+		keyName: appenv.RegistryKey,
 		openKey: func(access uint32) (registryKey, error) {
 			return registry.OpenKey(registry.CURRENT_USER, startupRunKeyPath, access)
 		},

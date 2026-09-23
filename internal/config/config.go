@@ -2,7 +2,7 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
+	"immich-windows-sync/internal/appenv"
 	"os"
 	"path/filepath"
 )
@@ -19,11 +19,11 @@ type Config struct {
 }
 
 func getConfigPath() (string, error) {
-	appdataDir := os.Getenv("APPDATA")
-	if appdataDir == "" {
-		return "", fmt.Errorf(`Environment variable "APPDATA" is empty.`)
+	appDir, err := appenv.AppDir()
+	if err != nil {
+		return "", err
 	}
-	configPath := filepath.Join(appdataDir, "immich-sync", "config.json")
+	configPath := filepath.Join(appDir, "config.json")
 	return configPath, nil
 }
 

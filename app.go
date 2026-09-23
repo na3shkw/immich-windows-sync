@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"immich-windows-sync/internal/appenv"
 	"immich-windows-sync/internal/config"
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/debounce"
@@ -12,7 +12,6 @@ import (
 	"immich-windows-sync/internal/synclog"
 	"immich-windows-sync/internal/watcher"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -58,17 +57,17 @@ func (a *App) startup(ctx context.Context) {
 		APIKey:    cfg.Immich.APIKey,
 	}
 
-	appdataDir := os.Getenv("APPDATA")
-	if appdataDir == "" {
-		log.Fatal(fmt.Errorf(`Environment variable "APPDATA" is empty.`))
+	appDir, err := appenv.AppDir()
+	if err != nil {
+		log.Fatal(err)
 	}
-	dbFile := filepath.Join(appdataDir, "immich-sync", "syncdata.db")
+	dbFile := filepath.Join(appDir, "syncdata.db")
 	dbClient, err := db.NewClient(dbFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	a.syncLogPath = filepath.Join(appdataDir, "immich-sync", "sync.jsonl")
+	a.syncLogPath = filepath.Join(appDir, "sync.jsonl")
 	a.syncLog, err = synclog.Open(a.syncLogPath)
 	if err != nil {
 		log.Fatal(err)
@@ -102,8 +101,7 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 
-	isDev := runtime.Environment(a.ctx).BuildType == "dev"
-	a.startupRegistry = startup.NewStartup(isDev)
+	a.startupRegistry = startup.NewStartup()
 
 	go systray.Run(a.onTrayReady, a.onTrayExit)
 
