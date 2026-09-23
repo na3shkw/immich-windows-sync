@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -72,9 +73,14 @@ func (a *App) startup(ctx context.Context) {
 	// Events/NewDirectoriesのチャンネル自体はWatcherの生存期間を通じて一つだけなので、
 	// それを読み出すgoroutineもアプリ起動時に一度だけ立ち上げれば十分（StartWatcherの中で
 	// 毎回立ち上げるとgoroutineが際限なく増えてしまう）。
+	// ファイルコピー等で同一パスに対してCreate/Writeが短時間に複数回発火することがあるため、
+	// pathDebouncerで1回にまとめてから同期をトリガーする。
+	debouncer := newPathDebouncer(500*time.Millisecond, func(path string) {
+		a.syncer.SyncAssets([]string{path})
+	})
 	go func() {
 		for event := range a.watcher.Events {
-			a.syncer.SyncAssets([]string{event.Path})
+			debouncer.Trigger(event.Path)
 		}
 	}()
 	go func() {
