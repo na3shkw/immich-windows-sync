@@ -10,7 +10,7 @@ import (
 
 func newTestClient(t *testing.T) *Client {
 	t.Helper()
-	dbFile := filepath.Join(t.TempDir(), "test.db")
+	dbFile := filepath.Join(t.TempDir(), "test", "test.db")
 	client, err := NewClient(dbFile)
 	require.NoError(t, err)
 	t.Cleanup(func() {

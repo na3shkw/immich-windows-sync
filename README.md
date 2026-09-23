@@ -33,8 +33,8 @@ Windows 上で常駐し、指定したフォルダの画像・動画を [Immich]
 | ファイル | 本番ビルド | dev ビルド（`wails dev`） |
 |---------|-----------|--------------------------|
 | 設定 | `%APPDATA%\immich-sync\config.json` | `%APPDATA%\immich-sync-dev\config.json` |
-| 同期状態 DB | `%APPDATA%\immich-sync\syncdata.db` | `%APPDATA%\immich-sync-dev\syncdata.db` |
-| 同期ログ | `%APPDATA%\immich-sync\sync.jsonl` | `%APPDATA%\immich-sync-dev\sync.jsonl` |
+| 同期状態 DB | `%LOCALAPPDATA%\immich-sync\syncdata.db` | `%LOCALAPPDATA%\immich-sync-dev\syncdata.db` |
+| 同期ログ | `%LOCALAPPDATA%\immich-sync\sync.jsonl` | `%LOCALAPPDATA%\immich-sync-dev\sync.jsonl` |
 
 dev ビルドは本番の設定・DB・ログに影響しないよう保存先が分かれています。スタートアップ登録のレジストリキー名も dev/本番で別です。
 
@@ -63,7 +63,7 @@ dev ビルドは本番の設定・DB・ログに影響しないよう保存先�
 wails dev
 ```
 
-Vite の開発サーバーが立ち上がり、フロントエンドの変更がホットリロードされます。`-tags dev` でビルドされるため、データは `%APPDATA%\immich-sync-dev\` に保存されます。
+Vite の開発サーバーが立ち上がり、フロントエンドの変更がホットリロードされます。`-tags dev` でビルドされるため、データは `%APPDATA%\immich-sync-dev\` と `%LOCALAPPDATA%\immich-sync-dev\` に保存されます。
 
 ### Immich スタブサーバー
 

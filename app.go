@@ -57,17 +57,17 @@ func (a *App) startup(ctx context.Context) {
 		APIKey:    cfg.Immich.APIKey,
 	}
 
-	appDir, err := appenv.AppDir()
+	localAppDir, err := appenv.LocalAppDir()
 	if err != nil {
 		log.Fatal(err)
 	}
-	dbFile := filepath.Join(appDir, "syncdata.db")
+	dbFile := filepath.Join(localAppDir, "syncdata.db")
 	dbClient, err := db.NewClient(dbFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	a.syncLogPath = filepath.Join(appDir, "sync.jsonl")
+	a.syncLogPath = filepath.Join(localAppDir, "sync.jsonl")
 	a.syncLog, err = synclog.Open(a.syncLogPath)
 	if err != nil {
 		log.Fatal(err)

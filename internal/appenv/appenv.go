@@ -6,11 +6,19 @@ import (
 	"path/filepath"
 )
 
-func AppDir() (string, error) {
-	appdataDir := os.Getenv("APPDATA")
-	if appdataDir == "" {
-		return "", fmt.Errorf(`Environment variable "APPDATA" is empty.`)
+func getDir(name string) (string, error) {
+	val := os.Getenv(name)
+	if val == "" {
+		return "", fmt.Errorf(`Environment variable "%s" is empty.`, name)
 	}
-	path := filepath.Join(appdataDir, appDirName)
+	path := filepath.Join(val, appDirName)
 	return path, nil
+}
+
+func AppDir() (string, error) {
+	return getDir("APPDATA")
+}
+
+func LocalAppDir() (string, error) {
+	return getDir("LOCALAPPDATA")
 }

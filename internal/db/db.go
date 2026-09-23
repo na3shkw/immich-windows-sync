@@ -2,11 +2,17 @@ package db
 
 import (
 	"database/sql"
+	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
 
 func NewClient(dbFile string) (*Client, error) {
+	err := os.MkdirAll(filepath.Dir(dbFile), 0755)
+	if err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", dbFile)
 	if err != nil {
 		return nil, err
@@ -16,6 +22,7 @@ func NewClient(dbFile string) (*Client, error) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS assets (
 		id                   INTEGER  PRIMARY KEY AUTOINCREMENT,
 		immich_id            TEXT,
+		immich_status        TEXT,
 		path                 TEXT     NOT NULL UNIQUE,
 		status               TEXT     NOT NULL CHECK(status IN ('success', 'syncing', 'failed')),
 		failed_count         INTEGER  NOT NULL DEFAULT 0,
@@ -26,46 +33,9 @@ func NewClient(dbFile string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := addImmichStatusColumnIfMissing(db); err != nil {
-		return nil, err
-	}
 	return &Client{
 		db: db,
 	}, nil
-}
-
-// addImmichStatusColumnIfMissing はImmichのアップロードレスポンスのstatus（created/duplicate等）を
-// 記録するための immich_status 列を追加する。CREATE TABLE IF NOT EXISTS は既存テーブルを
-// 書き換えないため、既にDBファイルが存在するケースに対応する軽量マイグレーションとして用意している。
-func addImmichStatusColumnIfMissing(db *sql.DB) error {
-	rows, err := db.Query(`PRAGMA table_info(assets)`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			cid       int
-			name      string
-			ctype     string
-			notNull   int
-			dfltValue sql.NullString
-			pk        int
-		)
-		if err := rows.Scan(&cid, &name, &ctype, &notNull, &dfltValue, &pk); err != nil {
-			return err
-		}
-		if name == "immich_status" {
-			return nil
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`ALTER TABLE assets ADD COLUMN immich_status TEXT`)
-	return err
 }
 
 func (c *Client) Close() error {

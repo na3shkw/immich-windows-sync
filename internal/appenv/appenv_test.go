@@ -20,3 +20,16 @@ func TestAppDir(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join("C:\\Users\\test\\AppData\\Roaming", appDirName), appDir)
 }
+
+func TestLocalAppDir_Error(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", "")
+	_, err := LocalAppDir()
+	assert.Error(t, err)
+}
+
+func TestLocalAppDir(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", "C:\\Users\\test\\AppData\\Local")
+	localAppDir, err := LocalAppDir()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("C:\\Users\\test\\AppData\\Local", appDirName), localAppDir)
+}

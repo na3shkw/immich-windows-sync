@@ -19,8 +19,9 @@
 | [0013](0013-auto-exclude-new-subfolders.md) | 監視中に作成された新しいサブフォルダは自動で除外リストに入れる | 承認済み |
 | [0014](0014-startup-registry.md) | スタートアップ登録はレジストリの Run キーで行う | 承認済み |
 | [0015](0015-dev-prod-build-tags.md) | dev ビルドと本番ビルドの切り替えにビルドタグを使う | 承認済み |
-| [0016](0016-data-in-appdata.md) | 設定・DB・ログを %APPDATA% 配下に保存する | 承認済み |
+| [0016](0016-data-in-appdata.md) | 設定・DB・ログを %APPDATA% 配下に保存する | 承認済み（一部 0018 で変更） |
 | [0017](0017-testing-with-fakes.md) | 外部環境に触れる処理は差し替え可能にし、テストではフェイクを注入する | 承認済み |
+| [0018](0018-local-data-in-localappdata.md) | DB と同期ログを %LOCALAPPDATA% 配下に移す | 承認済み |
 
 ## 今後の検討事項（未決定）
 
@@ -28,4 +29,3 @@
 - ローカルでの削除を Immich に反映するかどうかのオプション化（[0006](0006-one-way-sync.md)）
 - EXIF から撮影日時を取得する（[0011](0011-immich-client-design.md)）
 - 失敗したアップロードのリトライ強化
-- DB ファイルを `%LOCALAPPDATA%` へ移す（[0016](0016-data-in-appdata.md)）
