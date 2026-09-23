@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"immich-windows-sync/internal/config"
 	"immich-windows-sync/internal/db"
+	"immich-windows-sync/internal/debounce"
 	"immich-windows-sync/internal/immich"
 	"immich-windows-sync/internal/startup"
 	"immich-windows-sync/internal/synclog"
@@ -84,8 +85,8 @@ func (a *App) startup(ctx context.Context) {
 	// それを読み出すgoroutineもアプリ起動時に一度だけ立ち上げれば十分（StartWatcherの中で
 	// 毎回立ち上げるとgoroutineが際限なく増えてしまう）。
 	// ファイルコピー等で同一パスに対してCreate/Writeが短時間に複数回発火することがあるため、
-	// pathDebouncerで1回にまとめてから同期をトリガーする。
-	debouncer := newPathDebouncer(500*time.Millisecond, func(path string) {
+	// debounce.Debouncerで1回にまとめてから同期をトリガーする。
+	debouncer := debounce.New(500*time.Millisecond, func(path string) {
 		a.syncer.SyncAssets([]string{path})
 	})
 	go func() {
@@ -218,25 +219,32 @@ func (a *App) StartWatcher() error {
 // 内部的に「プレースホルダー名で作成→ユーザーが名前を確定するとリネーム」の2段階になっており、
 // タイミングによっては二重にプロンプトが出てしまう問題があったため見送った）。
 // 既に除外済みの場合は何もしない（冪等）。
+//
+// SaveConfigは「変更前(a.cfg)」と「変更後(引数のcfg)」を比較してWatcherの再起動要否を判断するため、
+// a.cfgを直接書き換えてから渡してはいけない（比較が常に「変更なし」になってしまう）。
+// 更新後の値は別のconfig.Configとして組み立ててからSaveConfigに渡す。
 func (a *App) excludeNewSubfolder(path string) error {
 	if slices.Contains(a.cfg.ExcludedFolders, path) {
 		return nil
 	}
-	a.cfg.ExcludedFolders = append(a.cfg.ExcludedFolders, path)
+	updated := *a.cfg
+	updated.ExcludedFolders = append(append([]string{}, a.cfg.ExcludedFolders...), path)
 	a.syncLog.Log(map[string]any{"event": "subfolder_auto_excluded", "path": path})
-	return a.SaveConfig(*a.cfg)
+	return a.SaveConfig(updated)
 }
 
 // RemoveExcludedFolder は除外リストからフォルダを取り除く（除外解除）。
+// excludeNewSubfolder と同様の理由で、a.cfgではなく新しいconfig.ConfigをSaveConfigに渡す。
 func (a *App) RemoveExcludedFolder(path string) error {
-	updated := make([]string, 0, len(a.cfg.ExcludedFolders))
+	filtered := make([]string, 0, len(a.cfg.ExcludedFolders))
 	for _, f := range a.cfg.ExcludedFolders {
 		if f != path {
-			updated = append(updated, f)
+			filtered = append(filtered, f)
 		}
 	}
-	a.cfg.ExcludedFolders = updated
-	return a.SaveConfig(*a.cfg)
+	updated := *a.cfg
+	updated.ExcludedFolders = filtered
+	return a.SaveConfig(updated)
 }
 
 func (a *App) IsWatcherRunning() bool {

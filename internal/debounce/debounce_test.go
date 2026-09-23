@@ -1,4 +1,4 @@
-package main
+package debounce
 
 import (
 	"sync"
@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPathDebouncer_Trigger(t *testing.T) {
-	t.Run("同一パスへの連続呼び出しは1回にまとめられる", func(t *testing.T) {
+func TestDebouncer_Trigger(t *testing.T) {
+	t.Run("同一キーへの連続呼び出しは1回にまとめられる", func(t *testing.T) {
 		var mu sync.Mutex
 		var fired []string
-		d := newPathDebouncer(50*time.Millisecond, func(path string) {
+		d := New(50*time.Millisecond, func(key string) {
 			mu.Lock()
 			defer mu.Unlock()
-			fired = append(fired, path)
+			fired = append(fired, key)
 		})
 
 		d.Trigger("a.jpg")
@@ -32,10 +32,10 @@ func TestPathDebouncer_Trigger(t *testing.T) {
 	t.Run("十分に間隔を空けた呼び出しはそれぞれ発火する", func(t *testing.T) {
 		var mu sync.Mutex
 		var fired []string
-		d := newPathDebouncer(30*time.Millisecond, func(path string) {
+		d := New(30*time.Millisecond, func(key string) {
 			mu.Lock()
 			defer mu.Unlock()
-			fired = append(fired, path)
+			fired = append(fired, key)
 		})
 
 		d.Trigger("a.jpg")
@@ -48,13 +48,13 @@ func TestPathDebouncer_Trigger(t *testing.T) {
 		assert.Equal(t, []string{"a.jpg", "a.jpg"}, fired)
 	})
 
-	t.Run("異なるパスは独立して扱われる", func(t *testing.T) {
+	t.Run("異なるキーは独立して扱われる", func(t *testing.T) {
 		var mu sync.Mutex
 		var fired []string
-		d := newPathDebouncer(30*time.Millisecond, func(path string) {
+		d := New(30*time.Millisecond, func(key string) {
 			mu.Lock()
 			defer mu.Unlock()
-			fired = append(fired, path)
+			fired = append(fired, key)
 		})
 
 		d.Trigger("a.jpg")
