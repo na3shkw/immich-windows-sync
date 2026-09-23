@@ -129,3 +129,20 @@ func TestSearchByStatus(t *testing.T) {
 	require.Len(t, assets, 1)
 	assert.Equal(t, "C:/photos/syncing.jpg", assets[0].Path)
 }
+
+func TestCountByStatus(t *testing.T) {
+	client := newTestClient(t)
+
+	require.NoError(t, client.MarkAsSyncing("C:/photos/syncing.jpg"))
+	require.NoError(t, client.MarkAsSyncing("C:/photos/success1.jpg"))
+	require.NoError(t, client.MarkAsSuccess("C:/photos/success1.jpg", "immich-id-1", "created"))
+	require.NoError(t, client.MarkAsSyncing("C:/photos/success2.jpg"))
+	require.NoError(t, client.MarkAsSuccess("C:/photos/success2.jpg", "immich-id-2", "created"))
+	require.NoError(t, client.MarkAsSyncing("C:/photos/failed.jpg"))
+	require.NoError(t, client.MarkAsFailed("C:/photos/failed.jpg", "network error"))
+
+	counts, err := client.CountByStatus()
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"success": 2, "syncing": 1, "failed": 1}, counts)
+}

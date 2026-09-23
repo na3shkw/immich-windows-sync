@@ -107,6 +107,30 @@ func (c *Client) SearchByStatus(status string) ([]*Asset, error) {
 	return assets, nil
 }
 
+// CountByStatus はstatusごとのレコード件数を返す。該当レコードがないstatusも0件として含める。
+func (c *Client) CountByStatus() (map[string]int64, error) {
+	counts := map[string]int64{"success": 0, "syncing": 0, "failed": 0}
+
+	rows, err := c.db.Query(`SELECT status, COUNT(*) FROM assets GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var status string
+		var count int64
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+		counts[status] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return counts, nil
+}
+
 func (c *Client) FindByPath(path string) (*Asset, error) {
 	row := c.db.QueryRow(
 		`SELECT

@@ -7,10 +7,12 @@ import (
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/immich"
 	"immich-windows-sync/internal/startup"
+	"immich-windows-sync/internal/synclog"
 	"immich-windows-sync/internal/syncer"
 	"immich-windows-sync/internal/watcher"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"time"
@@ -27,6 +29,8 @@ type App struct {
 	syncer          *syncer.Syncer
 	watcher         *watcher.Watcher
 	startupRegistry *startup.Startup
+	syncLog         *synclog.Logger
+	syncLogPath     string
 	// quitting はトレイの「終了」経由での終了かどうかを示す。
 	// beforeClose がウィンドウを隠すだけにするか、本当に終了させるかの判定に使う。
 	quitting bool
@@ -63,7 +67,13 @@ func (a *App) startup(ctx context.Context) {
 		log.Fatal(err)
 	}
 
-	a.syncer = syncer.NewSyncer(5, a.immichClient, dbClient)
+	a.syncLogPath = filepath.Join(appdataDir, "immich-sync", "sync.jsonl")
+	a.syncLog, err = synclog.Open(a.syncLogPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	a.syncer = syncer.NewSyncer(5, a.immichClient, dbClient, a.syncLog)
 
 	a.watcher, err = watcher.NewWatcher()
 	if err != nil {
@@ -107,6 +117,9 @@ func (a *App) startup(ctx context.Context) {
 // acquired during startup (e.g. the SQLite connection).
 func (a *App) shutdown(ctx context.Context) {
 	if err := a.syncer.Close(); err != nil {
+		log.Println(err)
+	}
+	if err := a.syncLog.Close(); err != nil {
 		log.Println(err)
 	}
 	systray.Quit()
@@ -192,7 +205,11 @@ func (a *App) SelectFolder() (string, error) {
 
 func (a *App) StartWatcher() error {
 	a.SyncNow()
-	return a.watcher.Start(a.cfg.TargetFolders, a.cfg.ExcludedFolders)
+	err := a.watcher.Start(a.cfg.TargetFolders, a.cfg.ExcludedFolders)
+	if err == nil {
+		a.syncLog.Log(map[string]any{"event": "watcher_started"})
+	}
+	return err
 }
 
 // excludeNewSubfolderは、監視中のフォルダ配下に新規作成されたサブフォルダを除外リストに追加する。
@@ -206,6 +223,7 @@ func (a *App) excludeNewSubfolder(path string) error {
 		return nil
 	}
 	a.cfg.ExcludedFolders = append(a.cfg.ExcludedFolders, path)
+	a.syncLog.Log(map[string]any{"event": "subfolder_auto_excluded", "path": path})
 	return a.SaveConfig(*a.cfg)
 }
 
@@ -230,7 +248,49 @@ func (a *App) StopWatcher() error {
 	if err != nil {
 		return err
 	}
+	a.syncLog.Log(map[string]any{"event": "watcher_stopped"})
 	return nil
+}
+
+// GetSyncSummary はstatusごとの同期済みアセット件数を返す。
+func (a *App) GetSyncSummary() (map[string]int64, error) {
+	return a.syncer.CountByStatus()
+}
+
+// FailedAsset はフロントエンドへ渡す用の失敗アセット情報。
+type FailedAsset struct {
+	Path        string    `json:"path"`
+	Reason      string    `json:"reason"`
+	FailedCount int64     `json:"failedCount"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func (a *App) GetFailedAssets() ([]FailedAsset, error) {
+	assets, err := a.syncer.FailedAssets()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]FailedAsset, 0, len(assets))
+	for _, asset := range assets {
+		result = append(result, FailedAsset{
+			Path:        asset.Path,
+			Reason:      asset.LatestFailedReason.String,
+			FailedCount: asset.FailedCount,
+			UpdatedAt:   asset.UpdatedAt,
+		})
+	}
+	return result, nil
+}
+
+// GetRecentLogLines は永続化された同期ログファイルの末尾n行を返す。
+func (a *App) GetRecentLogLines(n int) ([]string, error) {
+	return synclog.ReadRecent(a.syncLogPath, n)
+}
+
+// OpenLogFolder は同期ログファイルが置かれているフォルダをエクスプローラーで開く。
+// explorer.exeは正常終了時でも非0の終了コードを返すことがあるため、Startのみで完了を待たない。
+func (a *App) OpenLogFolder() error {
+	return exec.Command("explorer", filepath.Dir(a.syncLogPath)).Start()
 }
 
 func (a *App) SyncNow() {

@@ -3,6 +3,7 @@ package syncer
 import (
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/immich"
+	"immich-windows-sync/internal/synclog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,17 @@ func newTestDBClient(t *testing.T) *db.Client {
 		client.Close()
 	})
 	return client
+}
+
+func newTestLogger(t *testing.T) *synclog.Logger {
+	t.Helper()
+	logPath := filepath.Join(t.TempDir(), "sync.log")
+	logger, err := synclog.Open(logPath)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		logger.Close()
+	})
+	return logger
 }
 
 func writeTestFile(t *testing.T, path string) {
@@ -47,7 +59,7 @@ func TestScanUnsyncedFiles(t *testing.T) {
 	require.NoError(t, dbClient.MarkAsSyncing(syncedPNG))
 	require.NoError(t, dbClient.MarkAsSuccess(syncedPNG, "immich-id", "created"))
 
-	s := NewSyncer(1, &immich.Client{}, dbClient)
+	s := NewSyncer(1, &immich.Client{}, dbClient, newTestLogger(t))
 	files, err := s.ScanUnsyncedFiles(targetDir, nil)
 
 	require.NoError(t, err)
@@ -65,7 +77,7 @@ func TestScanUnsyncedFiles_Excluded(t *testing.T) {
 	writeTestFile(t, excludedJPG)
 
 	dbClient := newTestDBClient(t)
-	s := NewSyncer(1, &immich.Client{}, dbClient)
+	s := NewSyncer(1, &immich.Client{}, dbClient, newTestLogger(t))
 	files, err := s.ScanUnsyncedFiles(targetDir, []string{excludedDir})
 
 	require.NoError(t, err)
@@ -99,7 +111,7 @@ func TestSyncAssets(t *testing.T) {
 	defer server.Close()
 
 	dbClient := newTestDBClient(t)
-	s := NewSyncer(2, &immich.Client{ServerURL: server.URL, APIKey: "test-key"}, dbClient)
+	s := NewSyncer(2, &immich.Client{ServerURL: server.URL, APIKey: "test-key"}, dbClient, newTestLogger(t))
 
 	err := s.SyncAssets([]string{successPath1, successPath2, failPath})
 	require.NoError(t, err)

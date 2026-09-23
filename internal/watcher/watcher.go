@@ -81,10 +81,14 @@ func (w *Watcher) Start(targetDirs []string, excludedDirs []string) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	w.cancel = cancel
+	// goroutineの中では w.watcher を直接参照せず、この時点の値を fsWatcher に固定してから使う。
+	// w.watcher は Stop() で nil に戻される可能性があり、select は毎周 w.watcher.Events を
+	// 再評価するため、直接参照するとStop直後の一瞬nilを踏んでpanicすることがある。
+	fsWatcher := w.watcher
 	go func() {
 		for {
 			select {
-			case fsnotifyEvent, ok := <-w.watcher.Events:
+			case fsnotifyEvent, ok := <-fsWatcher.Events:
 				if !ok {
 					return
 				}
@@ -110,7 +114,7 @@ func (w *Watcher) Start(targetDirs []string, excludedDirs []string) error {
 						Path: eventPath,
 					}
 				}
-			case err := <-w.watcher.Errors:
+			case err := <-fsWatcher.Errors:
 				w.Errors <- err
 			case <-ctx.Done():
 				return

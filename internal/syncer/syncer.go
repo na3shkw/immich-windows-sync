@@ -3,6 +3,7 @@ package syncer
 import (
 	"immich-windows-sync/internal/db"
 	"immich-windows-sync/internal/immich"
+	"immich-windows-sync/internal/synclog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,7 @@ type Syncer struct {
 	workerCount  int
 	immichClient *immich.Client
 	dbClient     *db.Client
+	logger       *synclog.Logger
 }
 
 // 同期対象ファイルの拡張子
@@ -89,17 +91,28 @@ var targetExtensions = map[string]struct{}{
 	".x3f":  {},
 }
 
-func NewSyncer(workerCount int, immichClient *immich.Client, dbClient *db.Client) *Syncer {
+func NewSyncer(workerCount int, immichClient *immich.Client, dbClient *db.Client, logger *synclog.Logger) *Syncer {
 	return &Syncer{
 		workerCount:  workerCount,
 		immichClient: immichClient,
 		dbClient:     dbClient,
+		logger:       logger,
 	}
 }
 
 // アプリ終了時にdbClientを閉じる
 func (s *Syncer) Close() error {
 	return s.dbClient.Close()
+}
+
+// CountByStatus はstatusごとの同期済みアセット件数を返す。
+func (s *Syncer) CountByStatus() (map[string]int64, error) {
+	return s.dbClient.CountByStatus()
+}
+
+// FailedAssets は現在failed状態のアセット一覧を返す。
+func (s *Syncer) FailedAssets() ([]*db.Asset, error) {
+	return s.dbClient.SearchByStatus("failed")
 }
 
 // 指定フォルダを再帰的に走査して拡張子でフィルタリング後・未同期のものだけを抽出してファイルパスを返す
@@ -159,9 +172,17 @@ func (s *Syncer) SyncAssets(files []string) error {
 				uploadResult, err := s.immichClient.UploadAsset(path)
 				if err != nil {
 					s.dbClient.MarkAsFailed(path, err.Error())
+					s.logger.Log(map[string]any{"event": "upload", "status": "failed", "path": path, "reason": err.Error()})
 					continue
 				}
 				s.dbClient.MarkAsSuccess(path, uploadResult.Id, uploadResult.Status)
+				s.logger.Log(map[string]any{
+					"event":        "upload",
+					"status":       "success",
+					"path":         path,
+					"immichId":     uploadResult.Id,
+					"immichStatus": uploadResult.Status,
+				})
 			}
 		}()
 	}

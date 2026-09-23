@@ -11,8 +11,12 @@ import {
   UnRegisterStartup,
   IsWatcherRunning,
   RemoveExcludedFolder,
+  GetSyncSummary,
+  GetFailedAssets,
+  GetRecentLogLines,
+  OpenLogFolder,
 } from '../wailsjs/go/main/App';
-import { config } from '../wailsjs/go/models';
+import { config, main } from '../wailsjs/go/models';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 
 type Page = 'connection' | 'folders' | 'status' | 'startup';
@@ -26,7 +30,6 @@ function App() {
   );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [watcherStatus, setWatcherStatus] = useState<WatcherStatus>('stopped');
-  const [logs, setLogs] = useState<string[]>([]);
   const [startupRegistered, setStartupRegistered] = useState<boolean>(false);
   const [startupLoading, setStartupLoading] = useState<boolean>(false);
 
@@ -100,18 +103,15 @@ function App() {
   const handleStartWatcher = () => {
     StartWatcher();
     setWatcherStatus('running');
-    setLogs((prev) => [...prev, `[${now()}] Watcher started.`]);
   };
 
   const handleStopWatcher = () => {
     StopWatcher();
     setWatcherStatus('stopped');
-    setLogs((prev) => [...prev, `[${now()}] Watcher stopped.`]);
   };
 
   const handleSyncNow = () => {
     SyncNow();
-    setLogs((prev) => [...prev, `[${now()}] Manual sync triggered.`]);
   };
 
   const handleToggleStartup = async () => {
@@ -190,7 +190,6 @@ function App() {
           {activePage === 'status' && (
             <SyncStatusPage
               watcherStatus={watcherStatus}
-              logs={logs}
               onStart={handleStartWatcher}
               onStop={handleStopWatcher}
               onSyncNow={handleSyncNow}
@@ -207,10 +206,6 @@ function App() {
       </main>
     </div>
   );
-}
-
-function now() {
-  return new Date().toLocaleTimeString();
 }
 
 function ConnectionPage({
@@ -413,17 +408,49 @@ function FolderManagementPage({
 
 function SyncStatusPage({
   watcherStatus,
-  logs,
   onStart,
   onStop,
   onSyncNow,
 }: {
   watcherStatus: WatcherStatus;
-  logs: string[];
   onStart: () => void;
   onStop: () => void;
   onSyncNow: () => void;
 }) {
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [failedAssets, setFailedAssets] = useState<main.FailedAsset[]>([]);
+  const [logLines, setLogLines] = useState<string[]>([]);
+
+  const refresh = () => {
+    GetSyncSummary().then(setSummary);
+    GetFailedAssets().then(setFailedAssets);
+    GetRecentLogLines(50).then((lines) => setLogLines([...lines].reverse()));
+  };
+
+  // このページを開いている間、実際の同期状況（DB・ログファイル由来）を定期的に取り込む。
+  // Watcher/SaveConfigはバックエンドだけで完結する処理が多く、フロントエンドへの
+  // リアルタイム通知を都度実装するよりポーリングの方がシンプルなため。
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStart = () => {
+    onStart();
+    setTimeout(refresh, 300);
+  };
+
+  const handleStop = () => {
+    onStop();
+    setTimeout(refresh, 300);
+  };
+
+  const handleSyncNow = () => {
+    onSyncNow();
+    setTimeout(refresh, 300);
+  };
+
   return (
     <div className="w-full space-y-6">
       {/* Watcher Controls */}
@@ -437,7 +464,7 @@ function SyncStatusPage({
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={onSyncNow}
+              onClick={handleSyncNow}
               disabled={watcherStatus !== 'running'}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-surface-container-highest text-on-surface hover:bg-surface-bright disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             >
@@ -446,7 +473,7 @@ function SyncStatusPage({
             </button>
             {watcherStatus === 'stopped' ? (
               <button
-                onClick={onStart}
+                onClick={handleStart}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-gradient-to-br from-primary to-primary-container text-on-primary-fixed active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">play_arrow</span>
@@ -454,7 +481,7 @@ function SyncStatusPage({
               </button>
             ) : (
               <button
-                onClick={onStop}
+                onClick={handleStop}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-surface-container-highest text-error hover:bg-error-container/20 active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">stop</span>
@@ -465,21 +492,70 @@ function SyncStatusPage({
         </div>
       </div>
 
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <StatTile label="Success" value={summary.success ?? 0} className="text-secondary" />
+        <StatTile label="Failed" value={summary.failed ?? 0} className="text-error" />
+        <StatTile label="Syncing" value={summary.syncing ?? 0} className="text-primary" />
+      </div>
+
+      {/* Failed Assets */}
+      {failedAssets.length > 0 && (
+        <div className="bg-surface-container rounded-xl p-6 space-y-3">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-error">
+            Failed Assets
+          </span>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {failedAssets.map((asset) => (
+              <div
+                key={asset.path}
+                className="bg-surface-container-lowest rounded-lg px-4 py-3 text-xs space-y-1"
+              >
+                <p className="font-mono text-on-surface break-all">{asset.path}</p>
+                <p className="text-on-surface-variant">
+                  {asset.reason} (×{asset.failedCount})
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Log Area */}
       <div className="bg-surface-container rounded-xl p-6 space-y-3">
-        <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">
-          Logs
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">
+            Recent Activity
+          </span>
+          <button
+            onClick={() => OpenLogFolder()}
+            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            <span className="material-symbols-outlined text-[14px]">folder_open</span>
+            Open Log Folder
+          </button>
+        </div>
         <div className="bg-surface-container-lowest rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-on-surface-variant space-y-1">
-          {logs.length === 0 ? (
-            <p className="text-center pt-8">No logs yet.</p>
+          {logLines.length === 0 ? (
+            <p className="text-center pt-8">No activity yet.</p>
           ) : (
-            logs.map((log, i) => (
-              <p key={i}>{log}</p>
+            logLines.map((line, i) => (
+              <p key={i} className="break-all">{line}</p>
             ))
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, className }: { label: string; value: number; className?: string }) {
+  return (
+    <div className="bg-surface-container rounded-xl p-6 text-center">
+      <p className={`text-3xl font-bold ${className ?? ''}`}>{value}</p>
+      <p className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant mt-1">
+        {label}
+      </p>
     </div>
   );
 }
