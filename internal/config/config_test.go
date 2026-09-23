@@ -70,6 +70,9 @@ func TestSaveThenLoad(t *testing.T) {
 			"hoge/foo",
 			"bar/baz",
 		},
+		ExcludedFolders: []string{
+			"hoge/foo/excluded",
+		},
 	}
 	err := Save(want)
 	require.NoError(t, err)

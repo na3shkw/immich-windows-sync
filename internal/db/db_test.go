@@ -54,7 +54,7 @@ func TestMarkAsSyncing(t *testing.T) {
 				path := "C:/photos/a.jpg"
 				err := client.MarkAsSyncing(path)
 				require.NoError(t, err)
-				err = client.MarkAsSuccess(path, "immich-id-1")
+				err = client.MarkAsSuccess(path, "immich-id-1", "created")
 				require.NoError(t, err)
 			},
 		},
@@ -81,13 +81,14 @@ func TestMarkAsSuccess(t *testing.T) {
 	path := "C:/photos/a.jpg"
 
 	require.NoError(t, client.MarkAsSyncing(path))
-	require.NoError(t, client.MarkAsSuccess(path, "immich-id-1"))
+	require.NoError(t, client.MarkAsSuccess(path, "immich-id-1", "duplicate"))
 
 	asset, err := client.FindByPath(path)
 	require.NoError(t, err)
 	require.NotNil(t, asset)
 	assert.Equal(t, "success", asset.Status)
 	assert.Equal(t, "immich-id-1", asset.ImmichID.String)
+	assert.Equal(t, "duplicate", asset.ImmichStatus.String)
 }
 
 func TestMarkAsFailed(t *testing.T) {
@@ -120,7 +121,7 @@ func TestSearchByStatus(t *testing.T) {
 
 	require.NoError(t, client.MarkAsSyncing("C:/photos/syncing.jpg"))
 	require.NoError(t, client.MarkAsSyncing("C:/photos/success.jpg"))
-	require.NoError(t, client.MarkAsSuccess("C:/photos/success.jpg", "immich-id"))
+	require.NoError(t, client.MarkAsSuccess("C:/photos/success.jpg", "immich-id", "created"))
 
 	assets, err := client.SearchByStatus("syncing")
 

@@ -45,13 +45,31 @@ func TestScanUnsyncedFiles(t *testing.T) {
 
 	dbClient := newTestDBClient(t)
 	require.NoError(t, dbClient.MarkAsSyncing(syncedPNG))
-	require.NoError(t, dbClient.MarkAsSuccess(syncedPNG, "immich-id"))
+	require.NoError(t, dbClient.MarkAsSuccess(syncedPNG, "immich-id", "created"))
 
 	s := NewSyncer(1, &immich.Client{}, dbClient)
-	files, err := s.ScanUnsyncedFiles(targetDir)
+	files, err := s.ScanUnsyncedFiles(targetDir, nil)
 
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{unsyncedJPG, unsyncedUppercaseJPG}, files)
+}
+
+// ScanUnsyncedFiles: excludedDirsに指定したディレクトリはその配下ごとスキャン対象から除外されることを確認する
+func TestScanUnsyncedFiles_Excluded(t *testing.T) {
+	targetDir := t.TempDir()
+	includedJPG := filepath.Join(targetDir, "photo1.jpg")
+	excludedDir := filepath.Join(targetDir, "excluded")
+	excludedJPG := filepath.Join(excludedDir, "photo2.jpg")
+
+	writeTestFile(t, includedJPG)
+	writeTestFile(t, excludedJPG)
+
+	dbClient := newTestDBClient(t)
+	s := NewSyncer(1, &immich.Client{}, dbClient)
+	files, err := s.ScanUnsyncedFiles(targetDir, []string{excludedDir})
+
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{includedJPG}, files)
 }
 
 // SyncAssets: 複数ファイルをワーカープールで並行アップロードし、
@@ -91,12 +109,14 @@ func TestSyncAssets(t *testing.T) {
 	require.NotNil(t, successAsset1)
 	assert.Equal(t, "success", successAsset1.Status)
 	assert.Equal(t, "immich-id-ok1.jpg", successAsset1.ImmichID.String)
+	assert.Equal(t, "created", successAsset1.ImmichStatus.String)
 
 	successAsset2, err := dbClient.FindByPath(successPath2)
 	require.NoError(t, err)
 	require.NotNil(t, successAsset2)
 	assert.Equal(t, "success", successAsset2.Status)
 	assert.Equal(t, "immich-id-ok2.jpg", successAsset2.ImmichID.String)
+	assert.Equal(t, "created", successAsset2.ImmichStatus.String)
 
 	failAsset, err := dbClient.FindByPath(failPath)
 	require.NoError(t, err)

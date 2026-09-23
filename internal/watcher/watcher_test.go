@@ -54,6 +54,16 @@ func drainEvents(t *testing.T, ch <-chan Event, idleTimeout time.Duration) []Eve
 	}
 }
 
+// timeout以内に ch から何も届かないことを確認する
+func assertNoEvent[T any](t *testing.T, ch <-chan T, timeout time.Duration) {
+	t.Helper()
+	select {
+	case v := <-ch:
+		t.Fatalf("expected no event, but got: %+v", v)
+	case <-time.After(timeout):
+	}
+}
+
 func eventTypes(events []Event) []EventType {
 	types := make([]EventType, len(events))
 	for i, e := range events {
@@ -62,7 +72,7 @@ func eventTypes(events []Event) []EventType {
 	return types
 }
 
-// Start: 実際のファイル操作（作成・更新・削除）に応じて、対応するEventが
+// Start: 実際のファイル操作（作成・更新）に応じて、対応するEventが
 // Events チャネルに流れてくることを確認する
 func TestWatcher_Start(t *testing.T) {
 	dir := t.TempDir()
@@ -70,7 +80,7 @@ func TestWatcher_Start(t *testing.T) {
 
 	w, err := NewWatcher()
 	require.NoError(t, err)
-	require.NoError(t, w.Start([]string{dir}))
+	require.NoError(t, w.Start([]string{dir}, nil))
 	t.Cleanup(func() {
 		w.Stop()
 	})
@@ -88,11 +98,111 @@ func TestWatcher_Start(t *testing.T) {
 	for _, e := range events {
 		assert.Equal(t, filePath, e.Path)
 	}
+}
+
+// Stop後にStartを呼び直しても再度監視できることを確認する
+// （fsnotify.Watcherは一度Close()すると再利用できないため、内部で作り直す必要がある）
+func TestWatcher_StopThenStart(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "photo.jpg")
+
+	w, err := NewWatcher()
+	require.NoError(t, err)
+	require.NoError(t, w.Start([]string{dir}, nil))
+	require.NoError(t, w.Stop())
+
+	require.NoError(t, w.Start([]string{dir}, nil))
+	t.Cleanup(func() {
+		w.Stop()
+	})
+
+	require.NoError(t, os.WriteFile(filePath, []byte("data"), 0644))
+	events := drainEvents(t, w.Events, 300*time.Millisecond)
+	assert.Contains(t, eventTypes(events), Create)
+}
+
+// Start: Remove/Renameイベントは同期対象ではないため Events へ流れてこないことを確認する
+// （存在しないファイルへの同期試行が失敗し続け、DBにfailedレコードが残り続けるバグの修正）
+func TestWatcher_Start_RemoveIsNotSynced(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "photo.jpg")
+	require.NoError(t, os.WriteFile(filePath, []byte("data"), 0644))
+
+	w, err := NewWatcher()
+	require.NoError(t, err)
+	require.NoError(t, w.Start([]string{dir}, nil))
+	t.Cleanup(func() {
+		w.Stop()
+	})
 
 	require.NoError(t, os.Remove(filePath))
-	events = drainEvents(t, w.Events, 300*time.Millisecond)
-	assert.Contains(t, eventTypes(events), Remove)
+	assertNoEvent(t, w.Events, 300*time.Millisecond)
+}
+
+// Start: targetDirs配下に既に存在するサブディレクトリも再帰的に監視対象へ登録されることを確認する
+func TestWatcher_Start_RecursivelyWatchesExistingSubdirectories(t *testing.T) {
+	dir := t.TempDir()
+	subDir := filepath.Join(dir, "sub")
+	require.NoError(t, os.Mkdir(subDir, 0755))
+	filePath := filepath.Join(subDir, "photo.jpg")
+
+	w, err := NewWatcher()
+	require.NoError(t, err)
+	require.NoError(t, w.Start([]string{dir}, nil))
+	t.Cleanup(func() {
+		w.Stop()
+	})
+
+	require.NoError(t, os.WriteFile(filePath, []byte("data"), 0644))
+	events := drainEvents(t, w.Events, 300*time.Millisecond)
+	assert.Contains(t, eventTypes(events), Create)
 	for _, e := range events {
 		assert.Equal(t, filePath, e.Path)
 	}
 }
+
+// Start: excludedDirsに指定したサブディレクトリは監視対象に登録されないことを確認する
+func TestWatcher_Start_ExcludedSubdirectoryIsNotWatched(t *testing.T) {
+	dir := t.TempDir()
+	excludedDir := filepath.Join(dir, "excluded")
+	require.NoError(t, os.Mkdir(excludedDir, 0755))
+	filePath := filepath.Join(excludedDir, "photo.jpg")
+
+	w, err := NewWatcher()
+	require.NoError(t, err)
+	require.NoError(t, w.Start([]string{dir}, []string{excludedDir}))
+	t.Cleanup(func() {
+		w.Stop()
+	})
+
+	require.NoError(t, os.WriteFile(filePath, []byte("data"), 0644))
+	assertNoEvent(t, w.Events, 300*time.Millisecond)
+}
+
+// Start: 監視中のディレクトリ配下に新規作成されたサブディレクトリはNewDirectoriesへ通知され、
+// まだ監視対象には自動追加されないことを確認する
+func TestWatcher_Start_NotifiesNewSubdirectory(t *testing.T) {
+	dir := t.TempDir()
+	newSubDir := filepath.Join(dir, "new-sub")
+
+	w, err := NewWatcher()
+	require.NoError(t, err)
+	require.NoError(t, w.Start([]string{dir}, nil))
+	t.Cleanup(func() {
+		w.Stop()
+	})
+
+	require.NoError(t, os.Mkdir(newSubDir, 0755))
+
+	select {
+	case got := <-w.NewDirectories:
+		assert.Equal(t, newSubDir, got)
+	case <-time.After(2 * time.Second):
+		t.Fatal("NewDirectories did not receive the new subdirectory within timeout")
+	}
+
+	// まだ監視対象に追加されていないので、配下のファイル作成はEventsに流れてこない
+	require.NoError(t, os.WriteFile(filepath.Join(newSubDir, "photo.jpg"), []byte("data"), 0644))
+	assertNoEvent(t, w.Events, 300*time.Millisecond)
+}
+

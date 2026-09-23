@@ -4,9 +4,13 @@ import {config} from '../models';
 
 export function IsStartupRegistered():Promise<boolean>;
 
+export function IsWatcherRunning():Promise<boolean>;
+
 export function LoadConfig():Promise<config.Config>;
 
 export function RegisterStartup():Promise<void>;
+
+export function RemoveExcludedFolder(arg1:string):Promise<void>;
 
 export function SaveConfig(arg1:config.Config):Promise<void>;
 

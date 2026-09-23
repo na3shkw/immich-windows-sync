@@ -13,8 +13,9 @@ type ImmichConfig struct {
 }
 
 type Config struct {
-	Immich        ImmichConfig `json:"immich"`
-	TargetFolders []string     `json:"targetFolders"`
+	Immich          ImmichConfig `json:"immich"`
+	TargetFolders   []string     `json:"targetFolders"`
+	ExcludedFolders []string     `json:"excludedFolders"`
 }
 
 func getConfigPath() (string, error) {

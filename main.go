@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"immich-windows-sync/internal/singleinstance"
+	"log"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -11,12 +13,24 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed build/windows/icon.ico
+var trayIcon []byte
+
 func main() {
+	lock := singleinstance.New()
+	alreadyRunning, err := lock.Acquire()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if alreadyRunning {
+		return
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 
 	// Create application with options
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:     "Immich Windows Sync",
 		Width:     1024,
 		Height:    768,
@@ -28,6 +42,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
+		OnBeforeClose:    app.beforeClose,
 		Bind: []interface{}{
 			app,
 		},

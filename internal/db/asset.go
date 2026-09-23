@@ -19,6 +19,9 @@ type Asset struct {
 	LatestFailedReason sql.NullString
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	// ImmichStatus はImmichのアップロードレスポンスのstatus（created/duplicate等）をそのまま記録する。
+	// syncの成否を表す Status とは別軸の情報。
+	ImmichStatus sql.NullString
 }
 
 // レコードが存在しなければINSERT、存在すれば同期中状態にUPDATEする
@@ -34,15 +37,16 @@ func (c *Client) MarkAsSyncing(path string) error {
 	return err
 }
 
-func (c *Client) MarkAsSuccess(path string, immichId string) error {
+func (c *Client) MarkAsSuccess(path string, immichId string, immichStatus string) error {
 	_, err := c.db.Exec(
 		`UPDATE assets
 		SET
 			status = ?,
 			immich_id = ?,
+			immich_status = ?,
 			updated_at = ?
 		WHERE path = ?`,
-		"success", immichId, time.Now(), path,
+		"success", immichId, immichStatus, time.Now(), path,
 	)
 	return err
 }
@@ -71,7 +75,8 @@ func (c *Client) SearchByStatus(status string) ([]*Asset, error) {
 			failed_count,
 			latest_failed_reason,
 			created_at,
-			updated_at
+			updated_at,
+			immich_status
 		FROM assets WHERE status = ?`,
 		status,
 	)
@@ -92,6 +97,7 @@ func (c *Client) SearchByStatus(status string) ([]*Asset, error) {
 			&asset.LatestFailedReason,
 			&asset.CreatedAt,
 			&asset.UpdatedAt,
+			&asset.ImmichStatus,
 		)
 		if err != nil {
 			return nil, err
@@ -111,7 +117,8 @@ func (c *Client) FindByPath(path string) (*Asset, error) {
 			failed_count,
 			latest_failed_reason,
 			created_at,
-			updated_at
+			updated_at,
+			immich_status
 		FROM assets WHERE path = ?`,
 		path,
 	)
@@ -126,6 +133,7 @@ func (c *Client) FindByPath(path string) (*Asset, error) {
 		&asset.LatestFailedReason,
 		&asset.CreatedAt,
 		&asset.UpdatedAt,
+		&asset.ImmichStatus,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

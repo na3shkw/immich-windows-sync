@@ -6,12 +6,20 @@ export function IsStartupRegistered() {
   return window['go']['main']['App']['IsStartupRegistered']();
 }
 
+export function IsWatcherRunning() {
+  return window['go']['main']['App']['IsWatcherRunning']();
+}
+
 export function LoadConfig() {
   return window['go']['main']['App']['LoadConfig']();
 }
 
 export function RegisterStartup() {
   return window['go']['main']['App']['RegisterStartup']();
+}
+
+export function RemoveExcludedFolder(arg1) {
+  return window['go']['main']['App']['RemoveExcludedFolder'](arg1);
 }
 
 export function SaveConfig(arg1) {

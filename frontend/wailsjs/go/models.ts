@@ -17,6 +17,7 @@ export namespace config {
 	export class Config {
 	    immich: ImmichConfig;
 	    targetFolders: string[];
+	    excludedFolders: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -26,6 +27,7 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.immich = this.convertValues(source["immich"], ImmichConfig);
 	        this.targetFolders = source["targetFolders"];
+	        this.excludedFolders = source["excludedFolders"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

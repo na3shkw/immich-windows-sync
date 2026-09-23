@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react';
-import { LoadConfig, SaveConfig, SelectFolder, StartWatcher, StopWatcher, SyncNow, IsStartupRegistered, RegisterStartup, UnRegisterStartup } from '../wailsjs/go/main/App';
+import {
+  LoadConfig,
+  SaveConfig,
+  SelectFolder,
+  StartWatcher,
+  StopWatcher,
+  SyncNow,
+  IsStartupRegistered,
+  RegisterStartup,
+  UnRegisterStartup,
+  IsWatcherRunning,
+  RemoveExcludedFolder,
+} from '../wailsjs/go/main/App';
 import { config } from '../wailsjs/go/models';
+import { EventsOn } from '../wailsjs/runtime/runtime';
 
 type Page = 'connection' | 'folders' | 'status' | 'startup';
 type SaveStatus = 'idle' | 'saved' | 'error';
@@ -9,7 +22,7 @@ type WatcherStatus = 'stopped' | 'running';
 function App() {
   const [activePage, setActivePage] = useState<Page>('connection');
   const [cfg, setCfg] = useState<config.Config>(
-    config.Config.createFrom({ immich: { serverURL: '', apiKey: '' }, targetFolders: [] })
+    config.Config.createFrom({ immich: { serverURL: '', apiKey: '' }, targetFolders: [], excludedFolders: [] })
   );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [watcherStatus, setWatcherStatus] = useState<WatcherStatus>('stopped');
@@ -20,7 +33,37 @@ function App() {
   useEffect(() => {
     LoadConfig().then(setCfg);
     IsStartupRegistered().then(setStartupRegistered);
+    IsWatcherRunning().then((running) => setWatcherStatus(running ? 'running' : 'stopped'));
   }, []);
+
+  // 新規サブフォルダの自動除外など、バックエンド側で設定が変わった場合に画面を最新化する
+  useEffect(() => {
+    return EventsOn('configChanged', () => {
+      LoadConfig().then(setCfg);
+    });
+  }, []);
+
+  const handleRemoveExcludedFolder = async (path: string) => {
+    await RemoveExcludedFolder(path);
+    setCfg((prev) =>
+      config.Config.createFrom({
+        ...prev,
+        excludedFolders: (prev.excludedFolders ?? []).filter((f) => f !== path),
+      })
+    );
+  };
+
+  const handleAddExcludedFolder = async () => {
+    const folder = await SelectFolder();
+    if (!folder) return;
+    if (cfg.excludedFolders?.includes(folder)) return;
+    const updated = config.Config.createFrom({
+      ...cfg,
+      excludedFolders: [...(cfg.excludedFolders ?? []), folder],
+    });
+    setCfg(updated);
+    await SaveConfig(updated);
+  };
 
   const handleSave = async () => {
     try {
@@ -139,6 +182,9 @@ function App() {
               folders={cfg.targetFolders ?? []}
               onAdd={handleAddFolder}
               onRemove={handleRemoveFolder}
+              excludedFolders={cfg.excludedFolders ?? []}
+              onRemoveExcluded={handleRemoveExcludedFolder}
+              onAddExcluded={handleAddExcludedFolder}
             />
           )}
           {activePage === 'status' && (
@@ -265,51 +311,101 @@ function FolderManagementPage({
   folders,
   onAdd,
   onRemove,
+  excludedFolders,
+  onRemoveExcluded,
+  onAddExcluded,
 }: {
   folders: string[];
   onAdd: () => void;
   onRemove: (folder: string) => void;
+  excludedFolders: string[];
+  onRemoveExcluded: (folder: string) => void;
+  onAddExcluded: () => void;
 }) {
   return (
-    <div className="w-full">
-      <p className="text-on-surface-variant text-sm mb-8">
-        Select folders to monitor and sync to Immich.
-      </p>
+    <div className="w-full space-y-6">
+      <div>
+        <p className="text-on-surface-variant text-sm mb-8">
+          Select folders to monitor and sync to Immich.
+        </p>
 
-      <div className="bg-surface-container rounded-xl p-8 space-y-6">
-        <div className="space-y-2">
-          {folders.length === 0 ? (
+        <div className="bg-surface-container rounded-xl p-8 space-y-6">
+          <div className="space-y-2">
+            {folders.length === 0 ? (
+              <p className="text-on-surface-variant text-sm text-center py-6">
+                No folders added yet.
+              </p>
+            ) : (
+              folders.map((folder) => (
+                <div
+                  key={folder}
+                  className="flex items-center justify-between bg-surface-container-lowest border border-outline-variant/20 rounded-lg px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-primary text-[20px] shrink-0">folder</span>
+                    <span className="text-sm font-mono text-on-surface break-all">{folder}</span>
+                  </div>
+                  <button
+                    onClick={() => onRemove(folder)}
+                    className="material-symbols-outlined text-on-surface-variant hover:text-error transition-colors text-[20px] shrink-0 ml-4"
+                  >
+                    delete
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <button
+            onClick={onAdd}
+            className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant/40 hover:border-primary text-on-surface-variant hover:text-primary rounded-lg py-3 text-sm font-medium transition-all"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Add Folder
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-on-surface-variant text-sm mb-3">
+          Excluded folders — not synced. New subfolders are excluded automatically; add one manually
+          to exclude it yourself.
+        </p>
+        <div className="bg-surface-container rounded-xl p-8 space-y-2">
+          {excludedFolders.length === 0 ? (
             <p className="text-on-surface-variant text-sm text-center py-6">
-              No folders added yet.
+              No excluded folders.
             </p>
           ) : (
-            folders.map((folder) => (
+            excludedFolders.map((folder) => (
               <div
                 key={folder}
                 className="flex items-center justify-between bg-surface-container-lowest border border-outline-variant/20 rounded-lg px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-primary text-[20px] shrink-0">folder</span>
-                  <span className="text-sm font-mono text-on-surface break-all">{folder}</span>
+                  <span className="material-symbols-outlined text-on-surface-variant text-[20px] shrink-0">
+                    folder_off
+                  </span>
+                  <span className="text-sm font-mono text-on-surface-variant break-all">{folder}</span>
                 </div>
                 <button
-                  onClick={() => onRemove(folder)}
-                  className="material-symbols-outlined text-on-surface-variant hover:text-error transition-colors text-[20px] shrink-0 ml-4"
+                  onClick={() => onRemoveExcluded(folder)}
+                  className="text-xs font-medium text-primary hover:underline shrink-0 ml-4"
                 >
-                  delete
+                  Unexclude
                 </button>
               </div>
             ))
           )}
-        </div>
 
-        <button
-          onClick={onAdd}
-          className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant/40 hover:border-primary text-on-surface-variant hover:text-primary rounded-lg py-3 text-sm font-medium transition-all"
-        >
-          <span className="material-symbols-outlined text-[20px]">add</span>
-          Add Folder
-        </button>
+          <button
+            onClick={onAddExcluded}
+            className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant/40 hover:border-primary text-on-surface-variant hover:text-primary rounded-lg py-3 text-sm font-medium transition-all"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Add Excluded Folder
+          </button>
+        </div>
       </div>
     </div>
   );

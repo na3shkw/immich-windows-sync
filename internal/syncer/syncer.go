@@ -5,6 +5,7 @@ import (
 	"immich-windows-sync/internal/immich"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -102,17 +103,22 @@ func (s *Syncer) Close() error {
 }
 
 // 指定フォルダを再帰的に走査して拡張子でフィルタリング後・未同期のものだけを抽出してファイルパスを返す
-func (s *Syncer) ScanUnsyncedFiles(targetDir string) ([]string, error) {
+// excludedDirs に含まれるディレクトリはその配下ごとスキャン対象から除外する
+func (s *Syncer) ScanUnsyncedFiles(targetDir string, excludedDirs []string) ([]string, error) {
 	files := []string{}
 	err := filepath.Walk(targetDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
-			extension := strings.ToLower(filepath.Ext(path))
-			if _, ok := targetExtensions[extension]; ok {
-				files = append(files, path)
+		if info.IsDir() {
+			if slices.Contains(excludedDirs, path) {
+				return filepath.SkipDir
 			}
+			return nil
+		}
+		extension := strings.ToLower(filepath.Ext(path))
+		if _, ok := targetExtensions[extension]; ok {
+			files = append(files, path)
 		}
 		return nil
 	})
@@ -155,7 +161,7 @@ func (s *Syncer) SyncAssets(files []string) error {
 					s.dbClient.MarkAsFailed(path, err.Error())
 					continue
 				}
-				s.dbClient.MarkAsSuccess(path, uploadResult.Id)
+				s.dbClient.MarkAsSuccess(path, uploadResult.Id, uploadResult.Status)
 			}
 		}()
 	}
