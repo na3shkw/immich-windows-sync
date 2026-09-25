@@ -1,5 +1,9 @@
 # Immich Windows Sync
 
+<p align="center">
+  <img src="frontend/src/assets/images/icons/syncing/syncing-256.svg" alt="Immich Windows Sync" width="256" height="256">
+</p>
+
 Windows 上で常駐し、指定したフォルダの画像・動画を [Immich](https://immich.app/) サーバーへ自動でアップロードするデスクトップアプリです。Google ドライブのデスクトップアプリのような「置いておけば勝手に同期される」使用感を目指しています。
 
 ## 特徴
