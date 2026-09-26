@@ -29,8 +29,8 @@ func New(delay time.Duration, fire func(key string)) *Debouncer {
 // コールバック（別goroutine）の両方から触られるため、d.muで保護している。
 func (d *Debouncer) Trigger(key string) {
 	d.mu.Lock()
+	defer d.mu.Unlock()
 	val, ok := d.timers[key]
-	d.mu.Unlock()
 	if ok {
 		val.Reset(d.delay)
 	} else {

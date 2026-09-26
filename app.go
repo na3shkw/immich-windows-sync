@@ -10,6 +10,7 @@ import (
 	"immich-windows-sync/internal/startup"
 	"immich-windows-sync/internal/syncer"
 	"immich-windows-sync/internal/synclog"
+	"immich-windows-sync/internal/tray"
 	"immich-windows-sync/internal/watcher"
 	"log"
 	"os/exec"
@@ -86,7 +87,10 @@ func (a *App) startup(ctx context.Context) {
 	// ファイルコピー等で同一パスに対してCreate/Writeが短時間に複数回発火することがあるため、
 	// debounce.Debouncerで1回にまとめてから同期をトリガーする。
 	debouncer := debounce.New(500*time.Millisecond, func(path string) {
-		a.syncer.SyncAssets([]string{path})
+		err := a.syncAssets([]string{path})
+		if err != nil {
+			log.Println(err)
+		}
 	})
 	go func() {
 		for event := range a.watcher.Events {
@@ -141,8 +145,7 @@ func (a *App) quit() {
 }
 
 func (a *App) onTrayReady() {
-	systray.SetIcon(trayIcon)
-	systray.SetTooltip("Immich Windows Sync")
+	tray.MarkReady()
 
 	mShow := systray.AddMenuItem("開く", "ウィンドウを開く")
 	mQuit := systray.AddMenuItem("終了", "アプリケーションを終了")
@@ -158,6 +161,16 @@ func (a *App) onTrayReady() {
 			}
 		}
 	}()
+}
+
+func (a *App) refreshTrayStatus() error {
+	count, err := a.syncer.CountByStatus()
+	if err != nil {
+		return err
+	}
+	trayStatus := tray.ResolveStatus(a.syncer.RemainingCount(), count["failed"], a.watcher.IsRunning())
+	tray.SetStatus(trayStatus)
+	return nil
 }
 
 func (a *App) onTrayExit() {}
@@ -203,11 +216,12 @@ func (a *App) SelectFolder() (string, error) {
 }
 
 func (a *App) StartWatcher() error {
-	a.syncNow()
 	err := a.watcher.Start(a.cfg.TargetFolders, a.cfg.ExcludedFolders)
 	if err == nil {
 		a.syncLog.Log(map[string]any{"event": "watcher_started"})
 	}
+	// 監視していなかった間に追加されたファイルを同期する
+	a.syncNow()
 	return err
 }
 
@@ -255,6 +269,10 @@ func (a *App) StopWatcher() error {
 		return err
 	}
 	a.syncLog.Log(map[string]any{"event": "watcher_stopped"})
+	err = a.refreshTrayStatus()
+	if err != nil {
+		log.Println(err)
+	}
 	return nil
 }
 
@@ -304,8 +322,15 @@ func (a *App) SyncNow() {
 	a.syncNow()
 }
 
+func (a *App) syncAssets(files []string) error {
+	tray.SetStatus(tray.StatusSyncing)
+	a.syncer.SyncAssets(files)
+	return a.refreshTrayStatus()
+}
+
 func (a *App) syncNow() {
 	go func() {
+		tray.SetStatus(tray.StatusSyncing)
 		files := []string{}
 		for _, folder := range a.cfg.TargetFolders {
 			unsyncedFile, err := a.syncer.ScanUnsyncedFiles(folder, a.cfg.ExcludedFolders)
@@ -315,7 +340,10 @@ func (a *App) syncNow() {
 			files = append(files, unsyncedFile...)
 		}
 		a.syncLog.Log(map[string]any{"event": "sync_scanned", "fileCount": len(files)})
-		a.syncer.SyncAssets(files)
+		err := a.syncAssets(files)
+		if err != nil {
+			log.Println(err)
+		}
 	}()
 }
 

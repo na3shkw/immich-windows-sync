@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -35,11 +36,11 @@ type Watcher struct {
 	cancel         context.CancelFunc
 	watcher        *fsnotify.Watcher
 	excludedDirs   []string
-	running        bool
+	running        atomic.Bool
 }
 
 func (w *Watcher) IsRunning() bool {
-	return w.running
+	return w.running.Load()
 }
 
 func NewWatcher() (*Watcher, error) {
@@ -121,7 +122,7 @@ func (w *Watcher) Start(targetDirs []string, excludedDirs []string) error {
 			}
 		}
 	}()
-	w.running = true
+	w.running.Store(true)
 	return nil
 }
 
@@ -132,7 +133,7 @@ func (w *Watcher) Stop() error {
 		return err
 	}
 	w.watcher = nil
-	w.running = false
+	w.running.Store(false)
 	return nil
 }
 

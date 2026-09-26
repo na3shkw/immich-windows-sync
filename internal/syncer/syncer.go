@@ -9,13 +9,15 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type Syncer struct {
-	workerCount  int
-	immichClient *immich.Client
-	dbClient     *db.Client
-	logger       *synclog.Logger
+	workerCount    int
+	immichClient   *immich.Client
+	dbClient       *db.Client
+	logger         *synclog.Logger
+	remainingCount atomic.Int64
 }
 
 // 同期対象ファイルの拡張子
@@ -115,6 +117,11 @@ func (s *Syncer) FailedAssets() ([]*db.Asset, error) {
 	return s.dbClient.SearchByStatus("failed")
 }
 
+// RemainingCount は残り処理件数を返す。
+func (s *Syncer) RemainingCount() int64 {
+	return s.remainingCount.Load()
+}
+
 // 指定フォルダを再帰的に走査して拡張子でフィルタリング後・未同期のものだけを抽出してファイルパスを返す
 // excludedDirs に含まれるディレクトリはその配下ごとスキャン対象から除外する
 func (s *Syncer) ScanUnsyncedFiles(targetDir string, excludedDirs []string) ([]string, error) {
@@ -158,7 +165,29 @@ func (s *Syncer) ScanUnsyncedFiles(targetDir string, excludedDirs []string) ([]s
 	return unsyncedFiles, nil
 }
 
+func (s *Syncer) syncOne(path string) error {
+	s.dbClient.MarkAsSyncing(path)
+	defer s.remainingCount.Add(-1)
+
+	uploadResult, err := s.immichClient.UploadAsset(path)
+	if err != nil {
+		s.dbClient.MarkAsFailed(path, err.Error())
+		s.logger.Log(map[string]any{"event": "upload", "status": "failed", "path": path, "reason": err.Error()})
+		return err
+	}
+	s.dbClient.MarkAsSuccess(path, uploadResult.Id, uploadResult.Status)
+	s.logger.Log(map[string]any{
+		"event":        "upload",
+		"status":       "success",
+		"path":         path,
+		"immichId":     uploadResult.Id,
+		"immichStatus": uploadResult.Status,
+	})
+	return nil
+}
+
 func (s *Syncer) SyncAssets(files []string) error {
+	s.remainingCount.Add(int64(len(files)))
 	jobsCh := make(chan string)
 	var wg sync.WaitGroup
 	wg.Add(s.workerCount)
@@ -167,22 +196,7 @@ func (s *Syncer) SyncAssets(files []string) error {
 		go func() {
 			defer wg.Done()
 			for path := range jobsCh {
-				s.dbClient.MarkAsSyncing(path)
-
-				uploadResult, err := s.immichClient.UploadAsset(path)
-				if err != nil {
-					s.dbClient.MarkAsFailed(path, err.Error())
-					s.logger.Log(map[string]any{"event": "upload", "status": "failed", "path": path, "reason": err.Error()})
-					continue
-				}
-				s.dbClient.MarkAsSuccess(path, uploadResult.Id, uploadResult.Status)
-				s.logger.Log(map[string]any{
-					"event":        "upload",
-					"status":       "success",
-					"path":         path,
-					"immichId":     uploadResult.Id,
-					"immichStatus": uploadResult.Status,
-				})
+				_ = s.syncOne(path)
 			}
 		}()
 	}

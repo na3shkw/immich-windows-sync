@@ -13,9 +13,6 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed build/windows/icon.ico
-var trayIcon []byte
-
 func main() {
 	lock := singleinstance.New()
 	alreadyRunning, err := lock.Acquire()
