@@ -8,7 +8,7 @@
   "frontend:dev:serverUrl": "auto",
   "info": {
     "productName": "Immich Windows Sync",
-    "productVersion": "0.1.0",
+    "productVersion": "0.1.1",
     "comments": ""
   },
   "author": {
