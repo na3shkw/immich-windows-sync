@@ -86,7 +86,11 @@ func (a *App) startup(ctx context.Context) {
 	// 毎回立ち上げるとgoroutineが際限なく増えてしまう）。
 	// ファイルコピー等で同一パスに対してCreate/Writeが短時間に複数回発火することがあるため、
 	// debounce.Debouncerで1回にまとめてから同期をトリガーする。
+	// Watcherのイベントにはディレクトリや同期対象外のファイルも含まれるため、ここで絞り込む。
 	debouncer := debounce.New(500*time.Millisecond, func(path string) {
+		if !syncer.IsSyncTarget(path) {
+			return
+		}
 		err := a.syncAssets([]string{path})
 		if err != nil {
 			log.Println(err)
@@ -331,6 +335,10 @@ func (a *App) syncAssets(files []string) error {
 func (a *App) syncNow() {
 	go func() {
 		tray.SetStatus(tray.StatusSyncing)
+		// 削除・リネーム済みファイルの failed レコードは再試行されずに残り続けるため、スキャン前に片付ける
+		if _, err := a.syncer.PruneFailed(); err != nil {
+			log.Println(err)
+		}
 		files := []string{}
 		for _, folder := range a.cfg.TargetFolders {
 			unsyncedFile, err := a.syncer.ScanUnsyncedFiles(folder, a.cfg.ExcludedFolders)

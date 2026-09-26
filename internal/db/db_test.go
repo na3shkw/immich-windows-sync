@@ -146,3 +146,18 @@ func TestCountByStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]int64{"success": 2, "syncing": 1, "failed": 1}, counts)
 }
+
+func TestDeleteByPath(t *testing.T) {
+	client := newTestClient(t)
+	path := "C:/photos/c.jpg"
+
+	require.NoError(t, client.MarkAsSyncing(path))
+	require.NoError(t, client.DeleteByPath(path))
+
+	asset, err := client.FindByPath(path)
+	require.NoError(t, err)
+	assert.Nil(t, asset)
+
+	// 存在しないパスの削除はエラーにならない
+	require.NoError(t, client.DeleteByPath(path))
+}

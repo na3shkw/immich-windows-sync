@@ -139,3 +139,54 @@ func TestSyncAssets(t *testing.T) {
 	assert.Equal(t, "failed", failAsset.Status)
 	assert.Equal(t, int64(1), failAsset.FailedCount)
 }
+
+// IsSyncTarget: 同期対象拡張子の通常ファイルのみtrueになり、ディレクトリ・非対象拡張子・存在しないファイルはfalseになることを確認する
+func TestIsSyncTarget(t *testing.T) {
+	targetDir := t.TempDir()
+	jpg := filepath.Join(targetDir, "photo.JPG")
+	txt := filepath.Join(targetDir, "desktop.ini")
+	dirWithExt := filepath.Join(targetDir, "folder.jpg")
+	writeTestFile(t, jpg)
+	writeTestFile(t, txt)
+	require.NoError(t, os.MkdirAll(dirWithExt, 0755))
+
+	assert.True(t, IsSyncTarget(jpg))
+	assert.False(t, IsSyncTarget(txt))
+	assert.False(t, IsSyncTarget(dirWithExt))
+	assert.False(t, IsSyncTarget(targetDir))
+	assert.False(t, IsSyncTarget(filepath.Join(targetDir, "missing.jpg")))
+}
+
+// PruneFailed: 同期対象でなくなったfailedレコードだけが削除され、
+// まだ存在する対象ファイルのfailedレコードやsuccessレコードは残ることを確認する
+func TestPruneFailed(t *testing.T) {
+	targetDir := t.TempDir()
+	existingFailed := filepath.Join(targetDir, "retry.jpg")
+	deletedFailed := filepath.Join(targetDir, "deleted.jpg")
+	dirFailed := filepath.Join(targetDir, "sub")
+	deletedSuccess := filepath.Join(targetDir, "uploaded.jpg")
+	writeTestFile(t, existingFailed)
+	require.NoError(t, os.MkdirAll(dirFailed, 0755))
+
+	dbClient := newTestDBClient(t)
+	for _, p := range []string{existingFailed, deletedFailed, dirFailed} {
+		require.NoError(t, dbClient.MarkAsSyncing(p))
+		require.NoError(t, dbClient.MarkAsFailed(p, "error"))
+	}
+	require.NoError(t, dbClient.MarkAsSyncing(deletedSuccess))
+	require.NoError(t, dbClient.MarkAsSuccess(deletedSuccess, "immich-id", "created"))
+
+	s := NewSyncer(1, &immich.Client{}, dbClient, newTestLogger(t))
+	pruned, err := s.PruneFailed()
+	require.NoError(t, err)
+	assert.Equal(t, 2, pruned)
+
+	failed, err := dbClient.SearchByStatus("failed")
+	require.NoError(t, err)
+	require.Len(t, failed, 1)
+	assert.Equal(t, existingFailed, failed[0].Path)
+
+	success, err := dbClient.FindByPath(deletedSuccess)
+	require.NoError(t, err)
+	assert.NotNil(t, success)
+}

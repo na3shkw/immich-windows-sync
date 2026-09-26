@@ -122,6 +122,49 @@ func (s *Syncer) RemainingCount() int64 {
 	return s.remainingCount.Load()
 }
 
+// hasTargetExtension は拡張子が同期対象（targetExtensions）かどうかを大文字小文字を区別せずに判定する。
+func hasTargetExtension(path string) bool {
+	_, ok := targetExtensions[strings.ToLower(filepath.Ext(path))]
+	return ok
+}
+
+// IsSyncTarget は path が現在ディスク上に存在する、同期対象拡張子の通常ファイルかどうかを返す。
+// Watcher のイベントにはディレクトリ（子ファイルの変更で親にも Write が発火する）や
+// ブラウザのダウンロード途中ファイル（.crdownload 等）・desktop.ini なども含まれるため、
+// アップロード前にこれで絞り込む。
+func IsSyncTarget(path string) bool {
+	if !hasTargetExtension(path) {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.Mode().IsRegular()
+}
+
+// PruneFailed は failed レコードのうち、もう同期対象ではなくなったもの
+// （削除・リネームされたファイルや、過去に誤ってアップロードを試みたディレクトリ・非対象ファイル）を削除し、
+// 削除した件数を返す。これらは再スキャンでも再試行されないため、残しておくとトレイの Error 表示が解除されない。
+func (s *Syncer) PruneFailed() (int, error) {
+	assets, err := s.dbClient.SearchByStatus("failed")
+	if err != nil {
+		return 0, err
+	}
+	pruned := 0
+	for _, a := range assets {
+		if IsSyncTarget(a.Path) {
+			continue
+		}
+		if err := s.dbClient.DeleteByPath(a.Path); err != nil {
+			return pruned, err
+		}
+		s.logger.Log(map[string]any{"event": "failed_record_pruned", "path": a.Path})
+		pruned++
+	}
+	return pruned, nil
+}
+
 // 指定フォルダを再帰的に走査して拡張子でフィルタリング後・未同期のものだけを抽出してファイルパスを返す
 // excludedDirs に含まれるディレクトリはその配下ごとスキャン対象から除外する
 func (s *Syncer) ScanUnsyncedFiles(targetDir string, excludedDirs []string) ([]string, error) {
@@ -136,8 +179,7 @@ func (s *Syncer) ScanUnsyncedFiles(targetDir string, excludedDirs []string) ([]s
 			}
 			return nil
 		}
-		extension := strings.ToLower(filepath.Ext(path))
-		if _, ok := targetExtensions[extension]; ok {
+		if hasTargetExtension(path) {
 			files = append(files, path)
 		}
 		return nil

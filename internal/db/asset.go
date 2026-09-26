@@ -169,3 +169,9 @@ func (c *Client) FindByPath(path string) (*Asset, error) {
 	}
 	return &asset, nil
 }
+
+// DeleteByPath は指定パスのレコードを削除する。レコードがなくてもエラーにはしない。
+func (c *Client) DeleteByPath(path string) error {
+	_, err := c.db.Exec(`DELETE FROM assets WHERE path = ?`, path)
+	return err
+}
