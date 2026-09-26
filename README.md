@@ -48,7 +48,11 @@ dev ビルドは本番の設定・DB・ログに影響しないよう保存先�
 
 - [Go](https://go.dev/) 1.25 以上
 - [Node.js](https://nodejs.org/) / npm
-- [Wails CLI](https://wails.io/) v2（`go install github.com/wailsapp/wails/v2/cmd/wails@latest`）
+- [Wails CLI](https://wails.io/) v2（`go.mod` の `github.com/wailsapp/wails/v2` と同じバージョン。次のコマンドで入れられます。）
+
+  ```sh
+  go install "github.com/wailsapp/wails/v2/cmd/wails@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)"
+  ```
 
 ### 技術スタック
 
