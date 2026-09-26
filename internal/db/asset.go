@@ -31,8 +31,8 @@ func (c *Client) MarkAsSyncing(path string) error {
 		VALUES (?, 'syncing', 0)
 		ON CONFLICT(path) DO UPDATE SET
 			status = 'syncing',
-			updated_at = ?`,
-		path, time.Now(),
+			updated_at = DATETIME('now')`,
+		path,
 	)
 	return err
 }
@@ -44,9 +44,9 @@ func (c *Client) MarkAsSuccess(path string, immichId string, immichStatus string
 			status = ?,
 			immich_id = ?,
 			immich_status = ?,
-			updated_at = ?
+			updated_at = DATETIME('now')
 		WHERE path = ?`,
-		"success", immichId, immichStatus, time.Now(), path,
+		"success", immichId, immichStatus, path,
 	)
 	return err
 }
@@ -58,9 +58,9 @@ func (c *Client) MarkAsFailed(path string, reason string) error {
 			status = ?,
 			failed_count = failed_count + 1,
 			latest_failed_reason = ?,
-			updated_at = ?
+			updated_at = DATETIME('now')
 		WHERE path = ?`,
-		"failed", reason, time.Now(), path,
+		"failed", reason, path,
 	)
 	return err
 }
