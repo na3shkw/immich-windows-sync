@@ -321,7 +321,7 @@ type FailedAsset struct {
 	Path        string    `json:"path"`
 	Reason      string    `json:"reason"`
 	FailedCount int64     `json:"failedCount"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	UpdatedAt   time.Time `json:"updatedAt" ts_type:"string"`
 }
 
 func (a *App) GetFailedAssets() ([]FailedAsset, error) {
