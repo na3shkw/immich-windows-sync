@@ -91,8 +91,9 @@ func apply(s Status) {
 }
 
 // ResolveStatus は同期状況を示す値を受け取ってトレイに表示するアイコンを判定する。
-func ResolveStatus(remainingCount, failedCount int64, watcherRunning bool) Status {
-	if remainingCount > 0 {
+// activeSyncs は実行中の同期処理（スキャン・アップロード）の数。
+func ResolveStatus(activeSyncs, failedCount int64, watcherRunning bool) Status {
+	if activeSyncs > 0 {
 		return StatusSyncing
 	}
 	if failedCount > 0 {

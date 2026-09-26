@@ -116,9 +116,6 @@ func TestSyncAssets(t *testing.T) {
 	err := s.SyncAssets([]string{successPath1, successPath2, failPath})
 	require.NoError(t, err)
 
-	remainingCount := s.RemainingCount()
-	assert.Equal(t, int64(0), remainingCount)
-
 	successAsset1, err := dbClient.FindByPath(successPath1)
 	require.NoError(t, err)
 	require.NotNil(t, successAsset1)

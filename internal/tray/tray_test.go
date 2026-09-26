@@ -9,7 +9,7 @@ import (
 func TestResolveStatus(t *testing.T) {
 	tests := []struct {
 		name           string
-		remainingCount int64
+		activeSyncs    int64
 		failedCount    int64
 		watcherRunning bool
 		want           Status
@@ -23,7 +23,7 @@ func TestResolveStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ResolveStatus(tt.remainingCount, tt.failedCount, tt.watcherRunning)
+			got := ResolveStatus(tt.activeSyncs, tt.failedCount, tt.watcherRunning)
 			assert.Equal(t, tt.want, got)
 		})
 	}

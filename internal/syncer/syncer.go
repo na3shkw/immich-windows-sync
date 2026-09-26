@@ -9,15 +9,13 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 type Syncer struct {
-	workerCount    int
-	immichClient   *immich.Client
-	dbClient       *db.Client
-	logger         *synclog.Logger
-	remainingCount atomic.Int64
+	workerCount  int
+	immichClient *immich.Client
+	dbClient     *db.Client
+	logger       *synclog.Logger
 }
 
 // 同期対象ファイルの拡張子
@@ -117,11 +115,6 @@ func (s *Syncer) FailedAssets() ([]*db.Asset, error) {
 	return s.dbClient.SearchByStatus("failed")
 }
 
-// RemainingCount は残り処理件数を返す。
-func (s *Syncer) RemainingCount() int64 {
-	return s.remainingCount.Load()
-}
-
 // hasTargetExtension は拡張子が同期対象（targetExtensions）かどうかを大文字小文字を区別せずに判定する。
 func hasTargetExtension(path string) bool {
 	_, ok := targetExtensions[strings.ToLower(filepath.Ext(path))]
@@ -209,7 +202,6 @@ func (s *Syncer) ScanUnsyncedFiles(targetDir string, excludedDirs []string) ([]s
 
 func (s *Syncer) syncOne(path string) error {
 	s.dbClient.MarkAsSyncing(path)
-	defer s.remainingCount.Add(-1)
 
 	uploadResult, err := s.immichClient.UploadAsset(path)
 	if err != nil {
@@ -229,7 +221,6 @@ func (s *Syncer) syncOne(path string) error {
 }
 
 func (s *Syncer) SyncAssets(files []string) error {
-	s.remainingCount.Add(int64(len(files)))
 	jobsCh := make(chan string)
 	var wg sync.WaitGroup
 	wg.Add(s.workerCount)

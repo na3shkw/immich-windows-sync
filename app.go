@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/getlantern/systray"
@@ -35,6 +36,13 @@ type App struct {
 	// quitting はトレイの「終了」経由での終了かどうかを示す。
 	// beforeClose がウィンドウを隠すだけにするか、本当に終了させるかの判定に使う。
 	quitting bool
+	// trayMu は activeSyncs の増減とトレイ状態の判定・反映をひとまとめにするためのロック。
+	// 判定（ResolveStatus）と反映（SetStatus）の間に別の同期が始まると、
+	// その Syncing 表示を古い判定結果で上書きしてしまうため、両者を同じロック内で行う。
+	trayMu sync.Mutex
+	// activeSyncs は実行中の同期処理（スキャン〜アップロード完了まで）の数。
+	// スキャン中はアップロード件数がまだ確定しないため、件数ではなく処理単位で数える。
+	activeSyncs int64
 }
 
 // NewApp creates a new App application struct
@@ -167,12 +175,35 @@ func (a *App) onTrayReady() {
 	}()
 }
 
+// beginSync は同期処理の開始を記録し、トレイを同期中表示にする。必ず endSync と対にして呼ぶ。
+func (a *App) beginSync() {
+	a.trayMu.Lock()
+	defer a.trayMu.Unlock()
+	a.activeSyncs++
+	tray.SetStatus(tray.StatusSyncing)
+}
+
+// endSync は同期処理の終了を記録し、トレイ表示を現在の状況に合わせて更新する。
+func (a *App) endSync() error {
+	a.trayMu.Lock()
+	defer a.trayMu.Unlock()
+	a.activeSyncs--
+	return a.refreshTrayStatusLocked()
+}
+
 func (a *App) refreshTrayStatus() error {
+	a.trayMu.Lock()
+	defer a.trayMu.Unlock()
+	return a.refreshTrayStatusLocked()
+}
+
+// refreshTrayStatusLocked は trayMu を保持した状態で呼ぶこと。
+func (a *App) refreshTrayStatusLocked() error {
 	count, err := a.syncer.CountByStatus()
 	if err != nil {
 		return err
 	}
-	trayStatus := tray.ResolveStatus(a.syncer.RemainingCount(), count["failed"], a.watcher.IsRunning())
+	trayStatus := tray.ResolveStatus(a.activeSyncs, count["failed"], a.watcher.IsRunning())
 	tray.SetStatus(trayStatus)
 	return nil
 }
@@ -327,14 +358,14 @@ func (a *App) SyncNow() {
 }
 
 func (a *App) syncAssets(files []string) error {
-	tray.SetStatus(tray.StatusSyncing)
+	a.beginSync()
 	a.syncer.SyncAssets(files)
-	return a.refreshTrayStatus()
+	return a.endSync()
 }
 
 func (a *App) syncNow() {
 	go func() {
-		tray.SetStatus(tray.StatusSyncing)
+		a.beginSync()
 		// 削除・リネーム済みファイルの failed レコードは再試行されずに残り続けるため、スキャン前に片付ける
 		if _, err := a.syncer.PruneFailed(); err != nil {
 			log.Println(err)
@@ -348,8 +379,8 @@ func (a *App) syncNow() {
 			files = append(files, unsyncedFile...)
 		}
 		a.syncLog.Log(map[string]any{"event": "sync_scanned", "fileCount": len(files)})
-		err := a.syncAssets(files)
-		if err != nil {
+		a.syncer.SyncAssets(files)
+		if err := a.endSync(); err != nil {
 			log.Println(err)
 		}
 	}()
