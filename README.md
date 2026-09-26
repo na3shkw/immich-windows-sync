@@ -6,6 +6,16 @@
 
 Windows 上で常駐し、指定したフォルダの画像・動画を [Immich](https://immich.app/) サーバーへ自動でアップロードするデスクトップアプリです。Google ドライブのデスクトップアプリのような「置いておけば勝手に同期される」使用感を目指しています。
 
+## スクリーンショット
+
+<p align="center">
+  <img src="docs/screenshots/screenshot-connection-settings.png" alt="接続設定" width="400">
+  <img src="docs/screenshots/screenshot-folder-management.png" alt="フォルダ管理" width="400">
+  <br>
+  <img src="docs/screenshots/screenshot-sync-status.png" alt="同期状況" width="400">
+  <img src="docs/screenshots/screenshot-startup-settings.png" alt="スタートアップ設定" width="400">
+</p>
+
 ## 特徴
 
 - **一方向同期**: Windows → Immich の一方向のみです。Windows 側でファイルを削除しても、Immich 上のアセットは削除されません
@@ -22,6 +32,62 @@ Windows 上で常駐し、指定したフォルダの画像・動画を [Immich]
 
 - Windows 10 / 11（WebView2 ランタイムが必要）
 - Immich サーバーと、アップロード権限を持つ API キー
+
+## インストール
+
+[Releases](https://github.com/na3shkw/immich-windows-sync/releases) から最新版の `immich-windows-sync.exe` をダウンロードし、常設する場所に置くだけです（インストーラーはありません）。
+[GitHub CLI](https://cli.github.com/) を使う場合は、PowerShell で次のように実行します。
+
+<details>
+<summary>インストールコマンド</summary>
+
+```powershell
+$dir = "$env:LOCALAPPDATA\Programs\immich-windows-sync"
+New-Item -ItemType Directory -Force $dir | Out-Null
+gh release download --repo na3shkw/immich-windows-sync --pattern "immich-windows-sync.exe" --dir $dir --clobber
+& "$dir\immich-windows-sync.exe"
+```
+
+</details>
+
+- 未署名のため、初回起動時に SmartScreen の警告が出ることがあります。「詳細情報」→「実行」で起動できます
+- スタートアップ登録は exe のパスを記録します。登録後に exe を移動・改名した場合は、Startup Settings で登録し直してください
+- アップデートする際は同じコマンドで exe を上書きします（起動中はトレイから終了してから実行してください）
+
+### スタートメニューへの登録（任意）
+
+<details>
+<summary>ショートカット作成コマンド</summary>
+
+```powershell
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Immich Windows Sync.lnk")
+$s.TargetPath = "$env:LOCALAPPDATA\Programs\immich-windows-sync\immich-windows-sync.exe"
+$s.Save()
+```
+
+</details>
+
+## アンインストール
+
+アプリに設定や DB を削除する機能はないため、手動で削除します。
+
+1. Startup Settings でスタートアップ登録を解除します
+2. トレイメニューからアプリを終了します
+3. 次のコマンドで exe と、設定・DB・同期ログを削除します
+
+<details>
+<summary>アンインストールコマンド</summary>
+
+```powershell
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\immich-windows-sync"
+Remove-Item -Recurse -Force "$env:APPDATA\immich-sync"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\immich-sync"
+Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Immich Windows Sync.lnk" -ErrorAction SilentlyContinue
+```
+
+</details>
+
+設定に保存された API キーも消えます。Immich 上のアップロード済みアセットには影響しません。
 
 ## 使い方
 
@@ -49,7 +115,6 @@ dev ビルドは本番の設定・DB・ログに影響しないよう保存先�
 - [Go](https://go.dev/) 1.25 以上
 - [Node.js](https://nodejs.org/) / npm
 - [Wails CLI](https://wails.io/) v2（`go.mod` の `github.com/wailsapp/wails/v2` と同じバージョン。次のコマンドで入れられます。）
-
   ```sh
   go install "github.com/wailsapp/wails/v2/cmd/wails@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)"
   ```
@@ -113,8 +178,12 @@ wails build
 │   ├── startup/         # Windows スタートアップ登録（レジストリ）
 │   ├── syncer/          # 同期ロジック・ワーカープール
 │   ├── synclog/         # 同期ログ（JSON Lines）の書き込み・読み出し
+│   ├── tray/            # タスクトレイ常駐（アイコン・メニュー）
 │   └── watcher/         # ファイル監視（fsnotify）
 ├── tools/immich-stub/   # 動作確認用の Immich スタブサーバー
+├── docs/
+│   ├── adr/             # 設計判断の記録（ADR）
+│   └── screenshots/     # README 用のスクリーンショット
 └── build/               # Wails ビルド設定・アイコン
 ```
 
