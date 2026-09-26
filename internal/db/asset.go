@@ -104,6 +104,9 @@ func (c *Client) SearchByStatus(status string) ([]*Asset, error) {
 		}
 		assets = append(assets, &asset)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return assets, nil
 }
 
