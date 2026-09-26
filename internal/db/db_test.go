@@ -3,6 +3,7 @@ package db
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,56 @@ func TestMarkAsFailed(t *testing.T) {
 	assert.Equal(t, "failed", asset.Status)
 	assert.Equal(t, int64(2), asset.FailedCount)
 	assert.Equal(t, "network error again", asset.LatestFailedReason.String)
+}
+
+// created_at / updated_at: 状態を更新するメソッドの実行後も、UTCの "YYYY-MM-DD HH:MM:SS" 形式で保存されていることを確認する
+// 業務上のカラムの値は TestMarkAs* が検証するため、ここでは時刻のカラムの保存形式だけを見る
+// updated_at は SQL 内で DATETIME('now') を指定して更新する（AGENTS.md、ADR 0008）
+// time.Now() を渡すとローカル時刻の文字列（"+0900 JST m=+..." など）で保存され、UTCと混在するため、その退行を検知する
+func TestTimestamps_StoredAsUTC(t *testing.T) {
+	const layout = "2006-01-02 15:04:05"
+	const oldValue = "2000-01-01 00:00:00"
+
+	tests := []struct {
+		name string
+		mark func(c *Client, path string) error
+	}{
+		{
+			name: "MarkAsSyncing",
+			mark: func(c *Client, path string) error { return c.MarkAsSyncing(path) },
+		},
+		{
+			name: "MarkAsSuccess",
+			mark: func(c *Client, path string) error { return c.MarkAsSuccess(path, "immich-id-1", "created") },
+		},
+		{
+			name: "MarkAsFailed",
+			mark: func(c *Client, path string) error { return c.MarkAsFailed(path, "network error") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newTestClient(t)
+			path := "C:/photos/a.jpg"
+			require.NoError(t, client.MarkAsSyncing(path))
+			// updated_at が更新されたことが分かるよう、古い値に置き換えておく
+			_, err := client.db.Exec(`UPDATE assets SET updated_at = ? WHERE path = ?`, oldValue, path)
+			require.NoError(t, err)
+
+			require.NoError(t, tt.mark(client, path))
+
+			var createdAt, updatedAt string
+			require.NoError(t, client.db.QueryRow(
+				`SELECT CAST(created_at AS TEXT), CAST(updated_at AS TEXT) FROM assets WHERE path = ?`, path,
+			).Scan(&createdAt, &updatedAt))
+			for column, raw := range map[string]string{"created_at": createdAt, "updated_at": updatedAt} {
+				got, err := time.Parse(layout, raw)
+				require.NoError(t, err, "%s: %q", column, raw)
+				assert.WithinDuration(t, time.Now().UTC(), got, 5*time.Second, column)
+			}
+		})
+	}
 }
 
 func TestFindByPath_NotFound(t *testing.T) {
