@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,6 +99,26 @@ func TestUploadAsset_FileNotFound(t *testing.T) {
 	client := &Client{ServerURL: "http://example.com", APIKey: "test-api-key"}
 
 	_, err := client.UploadAsset(filepath.Join(t.TempDir(), "missing.jpg"))
+
+	assert.Error(t, err)
+}
+
+// UploadAsset: サーバーが応答を返さない場合でも、タイムアウトでエラーになって処理が戻ることを確認する
+func TestUploadAsset_Timeout(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	// ハンドラーを先に解放しないと server.Close() が待ち続けてしまうため、Close より後に登録する（Cleanup は逆順に実行される）
+	t.Cleanup(server.Close)
+	t.Cleanup(func() { close(release) })
+
+	original := httpClient
+	httpClient = newHTTPClient(100*time.Millisecond, time.Second)
+	t.Cleanup(func() { httpClient = original })
+
+	client := &Client{ServerURL: server.URL, APIKey: "test-api-key"}
+	_, err := client.UploadAsset(newTestFile(t))
 
 	assert.Error(t, err)
 }

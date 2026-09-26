@@ -12,6 +12,24 @@ import (
 	"time"
 )
 
+// httpClient は Immich への通信に使う HTTP クライアント。
+// http.DefaultClient はタイムアウトがなく、NAS のスリープやネットワーク断で応答が返らないと
+// ワーカーが永久に待ち続けてしまうため、専用のクライアントでタイムアウトを設定する。
+//   - ResponseHeaderTimeout: リクエストを送り切ってからレスポンスヘッダが返るまでの待ち時間
+//     （接続確立・TLS ハンドシェイクのタイムアウトは DefaultTransport の設定を引き継ぐ）
+//   - Timeout: 接続からレスポンス本文の読み取りまでを含めた全体の上限。
+//     送信中に通信が止まった場合の最後の安全網として、写真のアップロードには十分長い値にしている
+var httpClient = newHTTPClient(60*time.Second, 10*time.Minute)
+
+func newHTTPClient(responseHeaderTimeout, timeout time.Duration) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = responseHeaderTimeout
+	return &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+	}
+}
+
 type Client struct {
 	ServerURL string
 	APIKey    string
@@ -90,7 +108,7 @@ func (c *Client) UploadAsset(filePath string) (*UploadResult, error) {
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
