@@ -97,8 +97,8 @@ func TestStartup_Register(t *testing.T) {
 			existing: map[string]string{},
 		},
 		{
-			name:     "以前の形式（--hidden なし）で登録済みなら上書きする",
-			existing: map[string]string{"ImmichWindowsSync-test": exePath},
+			name:     "既存の登録値があれば上書きする",
+			existing: map[string]string{"ImmichWindowsSync-test": `"C:\Old\immich-sync.exe" --hidden`},
 		},
 		{
 			name:     "他のアプリの登録値には触れない",

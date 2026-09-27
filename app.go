@@ -118,9 +118,6 @@ func (a *App) startup(ctx context.Context) {
 	}()
 
 	a.startupRegistry = startup.NewStartup()
-	if err := a.refreshStartupRegistration(); err != nil {
-		log.Println(err)
-	}
 
 	go systray.Run(a.onTrayReady, a.onTrayExit)
 
@@ -403,19 +400,6 @@ func (a *App) UnRegisterStartup() error {
 		return err
 	}
 	return nil
-}
-
-// refreshStartupRegistration は登録済みのスタートアップ設定を現在のコマンドラインで上書きする。
-// 以前のバージョンで登録された値（--hidden なし）や、exe の移動で古くなったパスを更新するため。
-func (a *App) refreshStartupRegistration() error {
-	registered, err := a.startupRegistry.IsRegistered()
-	if err != nil {
-		return err
-	}
-	if !registered {
-		return nil
-	}
-	return a.startupRegistry.Register()
 }
 
 func (a *App) IsStartupRegistered() (bool, error) {
