@@ -9,6 +9,10 @@ import (
 
 const startupRunKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
 
+// HiddenFlag はスタートアップ経由の起動であることを示すコマンドライン引数。
+// これが付いて起動された場合はウィンドウを表示せずタスクトレイに常駐する。
+const HiddenFlag = "--hidden"
+
 // registryKey は registry.Key のうち Startup が使うメソッドだけを切り出したインターフェース。
 // テストでは実際のレジストリに触れないフェイク実装に差し替える。
 type registryKey interface {
@@ -44,7 +48,8 @@ func (s *Startup) Register() error {
 		return err
 	}
 	defer key.Close()
-	err = key.SetStringValue(s.keyName, exePath)
+	// パスにスペースが含まれても引数と区別できるよう、実行ファイルのパスはダブルクォートで囲む
+	err = key.SetStringValue(s.keyName, `"`+exePath+`" `+HiddenFlag)
 	if err != nil {
 		return err
 	}

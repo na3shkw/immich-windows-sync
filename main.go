@@ -3,7 +3,10 @@ package main
 import (
 	"embed"
 	"immich-windows-sync/internal/singleinstance"
+	"immich-windows-sync/internal/startup"
 	"log"
+	"os"
+	"slices"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -23,16 +26,20 @@ func main() {
 		return
 	}
 
+	// スタートアップ経由で起動された場合はウィンドウを出さずにタスクトレイだけで常駐する
+	startHidden := slices.Contains(os.Args[1:], startup.HiddenFlag)
+
 	// Create an instance of the app structure
 	app := NewApp()
 
 	// Create application with options
 	err = wails.Run(&options.App{
-		Title:     "Immich Windows Sync",
-		Width:     1024,
-		Height:    768,
-		MinWidth:  1024,
-		MinHeight: 768,
+		Title:       "Immich Windows Sync",
+		Width:       1024,
+		Height:      768,
+		MinWidth:    1024,
+		MinHeight:   768,
+		StartHidden: startHidden,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
