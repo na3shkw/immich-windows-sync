@@ -23,7 +23,7 @@
 - Tailwind CSS は v3 から上げない。`frontend/wailsjs/` は自動生成物なので手で編集しない（[0004](docs/adr/0004-use-wails-react.md)）
 - SQLite ドライバは `modernc.org/sqlite` を使い、CGO に依存しない（[0007](docs/adr/0007-use-sqlite-modernc.md)）
 - `db.NewClient` の `SetMaxOpenConns(1)` と、`MarkAsSyncing` の UPSERT を崩さない（[0010](docs/adr/0010-serialize-db-writes.md)）
-- タイムスタンプは UTC で保存し、`updated_at` はアプリ側で `time.Now()` を渡す（[0008](docs/adr/0008-assets-table-schema.md)）
+- タイムスタンプは UTC で保存する。`updated_at` は SQL 内で `DATETIME('now')` を指定する（[0008](docs/adr/0008-assets-table-schema.md)）
 - `Syncer` と `Watcher` は互いを参照しない。つなぎ込みは `app.go` で行う。Watcher のチャネルを読む goroutine を `StartWatcher` の中で起動しない（[0012](docs/adr/0012-app-as-mediator.md)）
 - `SaveConfig` には `a.cfg` を書き換えたものではなく、新しく組み立てた `config.Config` を渡す（[0013](docs/adr/0013-auto-exclude-new-subfolders.md)）
 - データフォルダのパスは必ず `appenv.AppDir()` を通して取得する（[0015](docs/adr/0015-dev-prod-build-tags.md)）

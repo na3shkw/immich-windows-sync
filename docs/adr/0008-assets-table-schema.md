@@ -49,8 +49,6 @@
   - 空文字は「理由不明の失敗」を表す
 - **`created_at` / `updated_at`**
   - UTC で保存し、UI での表示時にローカル時刻へ変換する
-  - SQLite には `ON UPDATE CURRENT_TIMESTAMP` がない
-  - そのため `updated_at` はアプリ側で `time.Now()` を渡す
 
 ## 結果
 
