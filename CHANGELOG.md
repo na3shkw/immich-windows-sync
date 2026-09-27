@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.1.1](https://github.com/na3shkw/immich-windows-sync/compare/v0.1.0...v0.1.1) - 2026-09-27
+
+### Bug Fixes 🐛
+- updated_atをUTCで保存するよう修正 by @na3shkw in https://github.com/na3shkw/immich-windows-sync/pull/2
+- スタートアップ起動時はウィンドウを表示せずタスクトレイに常駐する by @na3shkw in https://github.com/na3shkw/immich-windows-sync/pull/14
+### Other Changes
+- Bump golang.org/x/crypto from 0.33.0 to 0.52.0 by @dependabot[bot] in https://github.com/na3shkw/immich-windows-sync/pull/3
+- Bump github.com/labstack/echo/v4 from 4.13.3 to 4.15.3 by @dependabot[bot] in https://github.com/na3shkw/immich-windows-sync/pull/4
+- npm 依存パッケージの一括アップデート by @na3shkw in https://github.com/na3shkw/immich-windows-sync/pull/13
+- Bump golang.org/x/net from 0.54.0 to 0.55.0 by @dependabot[bot] in https://github.com/na3shkw/immich-windows-sync/pull/7
+
 ## [v0.1.0](https://github.com/na3shkw/immich-windows-sync/commits/v0.1.0) - 2026-09-26
 
 ### New Features 🎉
