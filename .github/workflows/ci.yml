@@ -15,9 +15,9 @@ jobs:
     # internal/ 配下は Windows 専用コード（golang.org/x/sys/windows 等）を含むため Windows ランナーで実行する
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -32,9 +32,9 @@ jobs:
     name: Go fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -55,9 +55,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -72,14 +72,14 @@ jobs:
     runs-on: windows-latest
     needs: frontend-build
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
