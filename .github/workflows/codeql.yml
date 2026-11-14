@@ -1,0 +1,84 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '27 18 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # main への push / schedule の解析は途中でキャンセルしない
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+            runner: windows-latest
+          - language: javascript-typescript
+            build-mode: none
+            runner: ubuntu-latest
+          - language: actions
+            build-mode: none
+            runner: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7.0.0
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v7.0.0
+        if: matrix.language == 'go'
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # main.go が //go:embed all:frontend/dist を参照するため、Go のビルド前にフロントエンドをビルドする
+      # （CodeQL のトレース対象外にするため init より前で実行する）
+      - name: Install frontend dependencies
+        if: matrix.language == 'go'
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        if: matrix.language == 'go'
+        run: npm run build
+        working-directory: frontend
+
+      - uses: github/codeql-action/init@v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # ./... は frontend/node_modules 配下も走査する（Go が除外するのは . / _ 始まりと testdata のみ）ため、対象を明示する。
+      # トップレベルに Go のディレクトリを追加した場合はここにも追記する
+      - name: Build Go
+        if: matrix.language == 'go'
+        run: go build . ./internal/... ./tools/...
+
+      - uses: github/codeql-action/analyze@v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
