@@ -1,9 +1,5 @@
 name: CodeQL
 
-# Default setup は Linux ランナーで Go を解析するため、Windows 専用パッケージ
-# （golang.org/x/sys/windows/registry 等）が import できず解析が不完全になる。
-# Advanced setup に切り替え、Go のみ Windows ランナーで手動ビルドして解析する。
-
 on:
   push:
     branches: [main]
@@ -77,7 +73,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
-      # ./... だと frontend/node_modules 配下の .go ファイルまで対象になりうるため、対象を明示する。
+      # ./... は frontend/node_modules 配下も走査する（Go が除外するのは . / _ 始まりと testdata のみ）ため、対象を明示する。
       # トップレベルに Go のディレクトリを追加した場合はここにも追記する
       - name: Build Go
         if: matrix.language == 'go'
