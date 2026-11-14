@@ -14,7 +14,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # main への push / schedule の解析は途中でキャンセルしない
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -59,22 +60,28 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # main.go が //go:embed all:frontend/dist を参照するため、Go のビルド前にフロントエンドをビルドする
+      # （CodeQL のトレース対象外にするため init より前で実行する）
+      - name: Install frontend dependencies
+        if: matrix.language == 'go'
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        if: matrix.language == 'go'
+        run: npm run build
+        working-directory: frontend
+
       - uses: github/codeql-action/init@v4.39.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
-      # main.go が //go:embed all:frontend/dist を参照するため、Go のビルド前にフロントエンドをビルドする
-      - name: Build frontend
-        if: matrix.language == 'go'
-        run: |
-          npm ci
-          npm run build
-        working-directory: frontend
-
+      # ./... だと frontend/node_modules 配下の .go ファイルまで対象になりうるため、対象を明示する。
+      # トップレベルに Go のディレクトリを追加した場合はここにも追記する
       - name: Build Go
         if: matrix.language == 'go'
-        run: go build ./...
+        run: go build . ./internal/... ./tools/...
 
       - uses: github/codeql-action/analyze@v4.39.3
         with:
